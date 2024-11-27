@@ -3,7 +3,26 @@
 
 #include "filesystem.h"
 
-// simple hash function for file name
+/*
+Steps :
+
+1) simple hash process :
+    - it starts with an initial value of 0 for the hash
+    - apr for each character in the file name, it multiplies the current hash by 31 (a constant)
+    - adds the ASCII value of the current character
+    this process creates a unique number for each string (filename)
+
+
+2) modulo operaation:
+    - result of the hash is then taken modulo HASH_TABLE_SIZE
+    - this will ensures that the hash value always falls within the bounds of the hash table array ( mchkitch kayen exceptions f C)
+
+
+3) storing and retrieving files:
+    - when you store a file, its placed in the hash table at the index corresponding to the hash value
+    - when you want to seach for a file, the same hash function is used fel hsab te3 el index, and the file is searched at that index
+*/
+
 unsigned int hash_function(const char *filename) {
     unsigned int hash = 0;
     while (*filename) {
