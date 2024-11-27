@@ -1,32 +1,58 @@
 
-
-/*         DONE BY JINX                             */
+/*        DONE BY JINX          */
 
 #include "filesystem.h"
 
-File* find_file(SecondaryMemory *sm, const char *filename) {
-    File *current = sm->file_list;
-    while (current != NULL) {
-        if (strcmp(current->metadata.filename, filename) == 0)
-            return current;
-        current = current->next;
+// simple hash function for file name
+unsigned int hash_function(const char *filename) {
+    unsigned int hash = 0;
+    while (*filename) {
+        hash = (hash * 31) + *filename++;
     }
+    return hash % HASH_TABLE_SIZE;
+}
+
+// recherche hachage for flex
+File* find_file(SecondaryMemory *sm, const char *filename) {
+    unsigned int index = hash_function(filename);
+    File *file = sm->hash_table[index];
+
+    while (file != NULL) {
+        if (strcmp(file->metadata.filename, filename) == 0) {
+            return file;
+        }
+        file = file->next;
+    }
+
+    file = sm->file_list;
+    while (file != NULL) {
+        if (strcmp(file->metadata.filename, filename) == 0) {
+            return file;
+        }
+        file = file->next;
+    }
+    
     return NULL;
 }
 
 void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size) {
     if (block_size < sizeof(Record)) {
-        printf("Error: Block size (%d bytes) is too small to hold a record (%lu bytes).\n",
-               block_size, sizeof(Record));
+        printf("Error: Block size (%d bytes) is too small to hold a record (%lu bytes).\n", block_size, sizeof(Record));
         return;
     }
+
     sm->total_blocks = total_blocks;
     sm->block_size = block_size;
     sm->allocation_table = (int *)malloc(sizeof(int) * total_blocks);
     for (int i = 0; i < total_blocks; i++) {
         sm->allocation_table[i] = 0;
     }
+
     sm->file_list = NULL;
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        sm->hash_table[i] = NULL;
+    }
+
     printf("Secondary memory initialized with %d blocks of size %d.\n", total_blocks, block_size);
 }
 
@@ -69,8 +95,7 @@ void create_file(SecondaryMemory *sm) {
 
     int records_per_block = sm->block_size / sizeof(Record);
     if (records_per_block == 0) {
-        printf("Error: Block size (%d bytes) is too small for a record (%lu bytes).\n",
-               sm->block_size, sizeof(Record));
+        printf("Error: Block size (%d bytes) is too small for a record (%lu bytes).\n", sm->block_size, sizeof(Record));
         free(new_file);
         return;
     }
@@ -78,6 +103,7 @@ void create_file(SecondaryMemory *sm) {
 
     int blocks_allocated = 0;
     int first_block = -1;
+
 
     if (global_org == CONTIGUOUS) {
         for (int i = 0; i <= sm->total_blocks - blocks_needed; i++) {
@@ -134,6 +160,10 @@ void create_file(SecondaryMemory *sm) {
         }
         current->next = new_file;
     }
+
+    unsigned int index = hash_function(filename);
+    new_file->next = sm->hash_table[index];
+    sm->hash_table[index] = new_file;
 
     FILE *fp = fopen(filename, "w");
     if (fp == NULL) {

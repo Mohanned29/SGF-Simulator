@@ -1,3 +1,8 @@
+
+
+/*        DONE BY JINX          */
+
+
 #include "filesystem.h"
 
 int main() {
@@ -29,18 +34,22 @@ int main() {
         }
 
         switch (choice) {
-            case 1: {
+           case 1: {
                 int total_blocks, block_size;
                 printf("Enter total number of blocks: ");
                 scanf("%d", &total_blocks);
-                printf("Enter block size (in bytes): ");
-                scanf("%d", &block_size);
+                do {
+                    printf("Enter block size (in bytes): ");
+                    scanf("%d", &block_size);
+                } while (block_size < 261);
+
                 initialize_secondary_memory(&sm, total_blocks, block_size);
                 if (block_size >= sizeof(Record)) {
                     initialized = 1;
                 }
                 break;
             }
+            
             case 2:
                 create_file(&sm);
                 break;

@@ -1,6 +1,5 @@
 
-/*                   DONE BY JINX                */
-
+/*        DONE BY JINX          */
 
 #ifndef FILESYSTEM_H
 #define FILESYSTEM_H
@@ -12,6 +11,7 @@
 #define MAX_FILENAME 100
 #define MAX_FILES 50
 #define MAX_RECORDS 1000
+#define HASH_TABLE_SIZE 100
 
 typedef enum {
     CONTIGUOUS = 1,
@@ -47,6 +47,7 @@ typedef struct SecondaryMemory {
     int block_size;
     int *allocation_table;
     File *file_list;
+    File *hash_table[HASH_TABLE_SIZE];  // adding hash table for flex
 } SecondaryMemory;
 
 
@@ -64,4 +65,7 @@ void compact_memory(SecondaryMemory *sm);
 void clear_memory(SecondaryMemory *sm);
 void free_secondary_memory(SecondaryMemory *sm);
 
-#endif // FILESYSTEM_H
+unsigned int hash_function(const char *filename);
+File* find_file(SecondaryMemory *sm, const char *filename);
+
+#endif
