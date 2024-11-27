@@ -1,4 +1,3 @@
-
 /*        DONE BY JINX          */
 
 #include "filesystem.h"
@@ -120,24 +119,31 @@ void create_file(SecondaryMemory *sm) {
     }
     int blocks_needed = (num_records + records_per_block - 1) / records_per_block;
 
+    /*
+        when allocating contiguous space for a file
+        the code checks if enough blocks are available by looking for a sequence of free blocks
+        By adding a buffer (one extra block)
+        we ensure that even if a file grows
+        there is room to handle future changes or extensions without having to reallocate
+    */
     int blocks_allocated = 0;
     int first_block = -1;
-
+    int buffer_blocks_needed = blocks_needed + 1;  //add buffer block for potential expansion ( not checked )
 
     if (global_org == CONTIGUOUS) {
-        for (int i = 0; i <= sm->total_blocks - blocks_needed; i++) {
+        for (int i = 0; i <= sm->total_blocks - buffer_blocks_needed; i++) {
             int j;
-            for (j = 0; j < blocks_needed; j++) {
+            for (j = 0; j < buffer_blocks_needed; j++) {
                 if (sm->allocation_table[i + j] != 0) {
                     break;
                 }
             }
-            if (j == blocks_needed) {
+            if (j == buffer_blocks_needed) {
                 first_block = i;
-                for (j = 0; j < blocks_needed; j++) {
+                for (j = 0; j < buffer_blocks_needed; j++) {
                     sm->allocation_table[i + j] = 1;
                 }
-                blocks_allocated = blocks_needed;
+                blocks_allocated = buffer_blocks_needed;
                 break;
             }
         }
@@ -246,48 +252,34 @@ void display_file_metadata(SecondaryMemory *sm) {
 void search_record(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
     int record_id;
-    printf("Enter the file name: ");
+    File *file;
+    Record record;
+
+    printf("Enter file name: ");
     scanf("%s", filename);
-    File *file = find_file(sm, filename);
+
+    file = find_file(sm, filename);
     if (file == NULL) {
         printf("File '%s' not found.\n", filename);
         return;
     }
-    printf("Enter Record ID to search: ");
+
+    printf("Enter record ID to search: ");
     scanf("%d", &record_id);
 
-    FILE *fp = fopen(filename, "rb");
+    FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
         printf("Error opening file '%s'.\n", filename);
         return;
     }
 
-    Record record;
-    int found = 0;
-    int record_index = -1;
-    int index = 0;
-
-    while (fread(&record, sizeof(Record), 1, fp)) {
-        if (record.id == record_id) {
-            found = 1;
-            record_index = index;
-            break;
-        }
-        index++;
-    }
+    fseek(fp, (record_id - 1) * sizeof(Record), SEEK_SET);
+    fread(&record, sizeof(Record), 1, fp);
     fclose(fp);
 
-    if (found) {
-        int records_per_block = sm->block_size / sizeof(Record);
-        int block_number = record_index / records_per_block;
-        int displacement = record_index % records_per_block;
-        printf("Record found at Block %d, Displacement %d.\n",
-               file->metadata.first_block_address + block_number, displacement);
-        printf("Record Data: ID=%d, Data=%s\n", record.id, record.data);
-    } else {
-        printf("Record with ID %d not found in file '%s'.\n", record_id, filename);
-    }
+    printf("Record found: ID = %d, Data = %s\n", record.id, record.data);
 }
+
 
 void insert_record(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];

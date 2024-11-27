@@ -24,7 +24,7 @@ typedef enum {
 } InternalOrganization;
 
 typedef struct Record {
-    int id;
+    int id; //4 bits
     char data[256];
 } Record;
 
