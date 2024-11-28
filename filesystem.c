@@ -426,18 +426,28 @@ void defragment_file(SecondaryMemory *sm) {
 
     printf("Defragmentation completed for file '%s'.\n", filename);
 }
-
 void delete_file(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
     printf("Enter the file name to delete: ");
     scanf("%s", filename);
 
+    // Search for the file in the hash table
+    unsigned int index = hash_function(filename);
     File *prev = NULL;
-    File *current = sm->file_list;
+    File *current = sm->hash_table[index];
 
     while (current != NULL && strcmp(current->metadata.filename, filename) != 0) {
         prev = current;
         current = current->next;
+    }
+
+    if (current == NULL) {
+        current = sm->file_list;
+        prev = NULL;
+        while (current != NULL && strcmp(current->metadata.filename, filename) != 0) {
+            prev = current;
+            current = current->next;
+        }
     }
 
     if (current == NULL) {
@@ -451,7 +461,7 @@ void delete_file(SecondaryMemory *sm) {
     }
 
     if (current->metadata.global_org == CONTIGUOUS) {
-        for (int i = current->metadata.first_block_address;
+        for (int i = current->metadata.first_block_address; 
              i < current->metadata.first_block_address + current->metadata.size_in_blocks; i++) {
             sm->allocation_table[i] = 0;
         }
@@ -466,9 +476,25 @@ void delete_file(SecondaryMemory *sm) {
     }
 
     if (prev == NULL) {
-        sm->file_list = current->next;
+        sm->hash_table[index] = current->next;
     } else {
         prev->next = current->next;
+    }
+
+    prev = NULL;
+    File *file_list_prev = NULL;
+    File *file_list_current = sm->file_list;
+    while (file_list_current != NULL && strcmp(file_list_current->metadata.filename, filename) != 0) {
+        file_list_prev = file_list_current;
+        file_list_current = file_list_current->next;
+    }
+
+    if (file_list_current != NULL) {
+        if (file_list_prev == NULL) {
+            sm->file_list = file_list_current->next;
+        } else {
+            file_list_prev->next = file_list_current->next;
+        }
     }
 
     free(current);

@@ -38,10 +38,12 @@ int main() {
                 int total_blocks, block_size;
                 printf("Enter total number of blocks: ");
                 scanf("%d", &total_blocks);
-                do {
+                do{
                     printf("Enter block size (in bytes): ");
                     scanf("%d", &block_size);
-                } while (block_size < 261);
+                }while(block_size > 261);
+
+                
 
                 initialize_secondary_memory(&sm, total_blocks, block_size);
                 if (block_size >= sizeof(Record)) {
