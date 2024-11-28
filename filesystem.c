@@ -1,6 +1,9 @@
 /*        DONE BY JINX          */
 
 #include "filesystem.h"
+#include <io.h>
+#include <stdio.h>
+#include <stdint.h>  // For intptr_t if needed
 
 /*
 Steps :
@@ -320,13 +323,14 @@ void insert_record(SecondaryMemory *sm) {
                 printf("No more contiguous space available to expand the file.\n");
                 fp = fopen(filename, "rb+");
                 if (fp != NULL) {
-                    fseek(fp, -sizeof(Record), SEEK_END);
+                    fseeko(fp, -sizeof(Record), SEEK_END);
                     long size = ftell(fp);
 #ifdef _WIN32
-                    _chsize(_fileno(fp), size);
+    _chsize_s(_fileno(fp), size);
 #else
-                    ftruncate(fileno(fp), size);
+    ftruncate(fileno(fp), size);
 #endif
+
                     fclose(fp);
                 }
                 file->metadata.size_in_records--;
@@ -346,7 +350,7 @@ void insert_record(SecondaryMemory *sm) {
                 printf("No more space available to expand the file.\n");
                 fp = fopen(filename, "rb+");
                 if (fp != NULL) {
-                    fseek(fp, -sizeof(Record), SEEK_END);
+                    fseeko(fp, -sizeof(Record), SEEK_END);
                     long size = ftell(fp);
 #ifdef _WIN32
                     _chsize(_fileno(fp), size);

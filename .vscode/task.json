@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+      {
+          "label": "build main.c",
+          "type": "shell",
+          "command": "gcc",
+          "args": [
+              "-o", "main.exe",
+              "main.c", "filesystem.c",
+              "-L/c/msys64/mingw64/lib",
+              "-I/c/msys64/mingw64/include",
+              "-lraylib",
+              "-lopengl32",
+              "-lm",
+              "-lgdi32",
+              "-lwinuser",
+              "-luser32"
+          ],
+          "group": {
+              "kind": "build",
+              "isDefault": true
+          },
+          "problemMatcher": ["$gcc"],
+          "detail": "Generated task for building main.c"
+      }
+  ]
+}
