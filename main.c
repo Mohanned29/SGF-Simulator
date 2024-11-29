@@ -3,34 +3,38 @@
 #include <string.h>
 #include <stdlib.h>
 #include "filesystem.h"
-#include "C:\raylib\raylib\src\raylib.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include "filesystem.h"
+#include <math.h>
 
+void ShowSplashScreen();
 void ShowInitializationScreen();
 void ShowMainMenu();
 
 int main(void) {
-    InitWindow(800, 600, "File System Simulator");
+    InitWindow(1200, 800, "File System Simulator");
 
     SecondaryMemory sm;
     int initialized = 0;
     int total_blocks = 0;
     int block_size = 0;
     int choice = 0;
+
+    float splash_timer = 3.0f;
+
     while (!WindowShouldClose()) {
 
-        if (!initialized) {
-            ShowInitializationScreen(&initialized, &sm, &total_blocks, &block_size);
-        } else {
-            ShowMainMenu(&sm, &choice);
+        if (splash_timer > 0) {
+            ShowSplashScreen(&splash_timer);
+        }
+        else {
+            if (!initialized) {
+                ShowInitializationScreen(&initialized, &sm, &total_blocks, &block_size);
+            } else {
+                ShowMainMenu(&sm, &choice);
+            }
         }
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
-
         EndDrawing();
     }
 
@@ -39,7 +43,19 @@ int main(void) {
     return 0;
 }
 
-// Show initialization screen (Step 1)
+void ShowSplashScreen(float *timer) {
+    *timer -= GetFrameTime();
+
+    DrawText("Welcome to the File System Simulator", 300, 300, 40, DARKBLUE);
+    DrawText("Please wait, initializing...", 350, 360, 20, DARKGRAY);
+
+    DrawText("Loading...", 500 + (int)(sin(GetTime()) * 10), 450, 40, DARKGREEN);
+
+    if (*timer <= 0) {
+        *timer = 0;
+    }
+}
+
 void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size) {
     static char blocks_input[10] = "\0";
     static char size_input[10] = "\0";
@@ -107,11 +123,7 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
     }
 }
 
-// Show the main menu (Step 2)
 void ShowMainMenu(SecondaryMemory *sm, int *choice) {
-    int option_selected = 0;
-
-
     const char *menu_options[] = {
         "Create a file",
         "Display Memory State",
@@ -186,6 +198,3 @@ void ShowMainMenu(SecondaryMemory *sm, int *choice) {
             printf("Invalid choice. Please try again.\n");
     }
 }
-
-
-// gcc -o main main.c filesystem.c -lraylib -lopengl32 -lm -lgdi32
