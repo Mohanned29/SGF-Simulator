@@ -3,7 +3,7 @@
 #include "filesystem.h"
 #include <io.h>
 #include <stdio.h>
-#include <stdint.h>  // For intptr_t if needed
+#include <stdint.h>
 
 /*
 Steps :
@@ -283,11 +283,11 @@ void search_record(SecondaryMemory *sm) {
     printf("Record found: ID = %d, Data = %s\n", record.id, record.data);
 }
 
-
 void insert_record(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
     printf("Enter the file name to insert into: ");
     scanf("%s", filename);
+
     File *file = find_file(sm, filename);
     if (file == NULL) {
         printf("File '%s' not found.\n", filename);
@@ -306,13 +306,20 @@ void insert_record(SecondaryMemory *sm) {
     printf("Enter Record Data: ");
     scanf("%s", new_record.data);
 
-    fwrite(&new_record, sizeof(Record), 1, fp);
+    if (fwrite(&new_record, sizeof(Record), 1, fp) != 1) {
+        printf("Error writing record to file.\n");
+        fclose(fp);
+        return;
+    }
+
+
     fclose(fp);
 
     file->metadata.size_in_records++;
 
     int records_per_block = sm->block_size / sizeof(Record);
     int total_blocks_used = (file->metadata.size_in_records + records_per_block - 1) / records_per_block;
+
     if (total_blocks_used > file->metadata.size_in_blocks) {
         if (file->metadata.global_org == CONTIGUOUS) {
             int next_block = file->metadata.first_block_address + file->metadata.size_in_blocks;
@@ -321,19 +328,6 @@ void insert_record(SecondaryMemory *sm) {
                 file->metadata.size_in_blocks++;
             } else {
                 printf("No more contiguous space available to expand the file.\n");
-                fp = fopen(filename, "rb+");
-                if (fp != NULL) {
-                    fseeko(fp, -sizeof(Record), SEEK_END);
-                    long size = ftell(fp);
-#ifdef _WIN32
-    _chsize_s(_fileno(fp), size);
-#else
-    ftruncate(fileno(fp), size);
-#endif
-
-                    fclose(fp);
-                }
-                file->metadata.size_in_records--;
                 return;
             }
         } else if (file->metadata.global_org == CHAINED) {
@@ -348,18 +342,6 @@ void insert_record(SecondaryMemory *sm) {
             }
             if (!allocated) {
                 printf("No more space available to expand the file.\n");
-                fp = fopen(filename, "rb+");
-                if (fp != NULL) {
-                    fseeko(fp, -sizeof(Record), SEEK_END);
-                    long size = ftell(fp);
-#ifdef _WIN32
-                    _chsize(_fileno(fp), size);
-#else
-                    ftruncate(fileno(fp), size);
-#endif
-                    fclose(fp);
-                }
-                file->metadata.size_in_records--;
                 return;
             }
         }
@@ -367,6 +349,7 @@ void insert_record(SecondaryMemory *sm) {
 
     printf("Record inserted successfully into file '%s'.\n", filename);
 }
+
 
 void delete_record(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
@@ -435,7 +418,6 @@ void delete_file(SecondaryMemory *sm) {
     printf("Enter the file name to delete: ");
     scanf("%s", filename);
 
-    // Search for the file in the hash table
     unsigned int index = hash_function(filename);
     File *prev = NULL;
     File *current = sm->hash_table[index];
