@@ -1,200 +1,187 @@
 #include "C:\raylib\raylib\src\raylib.h"
-#include <stdio.h>
-#include <string.h>
+#include "raylib.h"
 #include <stdlib.h>
+#include <string.h>
 #include "filesystem.h"
-#include <math.h>
 
-void ShowSplashScreen();
-void ShowInitializationScreen();
-void ShowMainMenu();
+// Define application states
+typedef enum {
+    STATE_INITIALIZATION,
+    STATE_MAIN_MENU,
+    STATE_CREATE_FILE,
+    STATE_SEARCH_RECORD,
+    STATE_DISPLAY_MEMORY,
+    STATE_EXIT
+} AppState;
+
+// Function declarations
+void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size, AppState *state);
+void ShowMainMenu(AppState *state);
+void ShowCreateFileScreen(AppState *state);
+void ShowSearchRecordScreen(AppState *state);
+void ShowDisplayMemoryScreen(AppState *state);
+
+// Utility functions
+void DrawCenteredText(const char *text, int y, int fontSize, Color color);
+void TransitionEffect(Color color, int frames);
 
 int main(void) {
-    InitWindow(1200, 800, "File System Simulator");
+    InitWindow(800, 600, "File System Simulator");
+    SetTargetFPS(60);
 
     SecondaryMemory sm;
     int initialized = 0;
     int total_blocks = 0;
     int block_size = 0;
-    int choice = 0;
 
-    float splash_timer = 3.0f;
+    AppState state = STATE_INITIALIZATION;
 
-    while (!WindowShouldClose()) {
-
-        if (splash_timer > 0) {
-            ShowSplashScreen(&splash_timer);
-        }
-        else {
-            if (!initialized) {
-                ShowInitializationScreen(&initialized, &sm, &total_blocks, &block_size);
-            } else {
-                ShowMainMenu(&sm, &choice);
-            }
-        }
-
+    while (!WindowShouldClose() && state != STATE_EXIT) {
         BeginDrawing();
         ClearBackground(RAYWHITE);
+
+        switch (state) {
+            case STATE_INITIALIZATION:
+                ShowInitializationScreen(&initialized, &sm, &total_blocks, &block_size, &state);
+                break;
+            case STATE_MAIN_MENU:
+                ShowMainMenu(&state);
+                break;
+            case STATE_CREATE_FILE:
+                ShowCreateFileScreen(&state);
+                break;
+            case STATE_SEARCH_RECORD:
+                ShowSearchRecordScreen(&state);
+                break;
+            case STATE_DISPLAY_MEMORY:
+                ShowDisplayMemoryScreen(&state);
+                break;
+            default:
+                break;
+        }
+
         EndDrawing();
     }
 
     CloseWindow();
-
     return 0;
 }
 
-void ShowSplashScreen(float *timer) {
-    *timer -= GetFrameTime();
+// Centered text utility
+void DrawCenteredText(const char *text, int y, int fontSize, Color color) {
+    int textWidth = MeasureText(text, fontSize);
+    DrawText(text, (GetScreenWidth() - textWidth) / 2, y, fontSize, color);
+}
 
-    DrawText("Welcome to the File System Simulator", 300, 300, 40, DARKBLUE);
-    DrawText("Please wait, initializing...", 350, 360, 20, DARKGRAY);
-
-    DrawText("Loading...", 500 + (int)(sin(GetTime()) * 10), 450, 40, DARKGREEN);
-
-    if (*timer <= 0) {
-        *timer = 0;
+// Screen transition effect
+void TransitionEffect(Color color, int frames) {
+    for (int i = 0; i < frames; i++) {
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(color, (float)i / frames));
+        EndDrawing();
+        BeginDrawing();
     }
 }
 
-void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size) {
+// Initialization Screen
+void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size, AppState *state) {
     static char blocks_input[10] = "\0";
     static char size_input[10] = "\0";
     static int active_input = 0;
 
-    DrawText("Initialisation de la mémoire secondaire", 50, 50, 30, BLACK);
-    DrawText("Entrez le nombre total de blocs:", 50, 100, 20, BLACK);
-    DrawText("Entrez la taille des blocs (en octets):", 50, 160, 20, BLACK);
+    DrawCenteredText("Initialization Screen", 50, 30, DARKBLUE);
+    DrawText("Enter total blocks:", 50, 120, 20, BLACK);
+    DrawText("Enter block size (bytes):", 50, 180, 20, BLACK);
 
-    DrawRectangle(300, 90, 200, 40, LIGHTGRAY);
-    DrawText(blocks_input, 310, 100, 20, DARKGRAY);
+    // Input Fields
+    DrawRectangle(300, 110, 200, 40, active_input == 0 ? LIGHTGRAY : GRAY);
+    DrawText(blocks_input, 310, 120, 20, BLACK);
 
-    DrawRectangle(300, 150, 200, 40, LIGHTGRAY);
-    DrawText(size_input, 310, 160, 20, DARKGRAY);
+    DrawRectangle(300, 170, 200, 40, active_input == 1 ? LIGHTGRAY : GRAY);
+    DrawText(size_input, 310, 180, 20, BLACK);
 
-    if (active_input == 0) {
-        if (IsKeyPressed(KEY_BACKSPACE) && strlen(blocks_input) > 0) {
-            blocks_input[strlen(blocks_input) - 1] = '\0';
-        } else {
-            for (int i = 32; i < 128; i++) {
-                if (IsKeyPressed(i)) {
-                    char str[2] = { (char)i, '\0' };
-                    strcat(blocks_input, str);
-                }
-            }
-        }
-    }
-    if (active_input == 1) {
-        if (IsKeyPressed(KEY_BACKSPACE) && strlen(size_input) > 0) {
-            size_input[strlen(size_input) - 1] = '\0';
-        } else {
-            for (int i = 32; i < 128; i++) {
-                if (IsKeyPressed(i)) {
-                    char str[2] = { (char)i, '\0' };
-                    strcat(size_input, str);
-                }
+    if (active_input == 0 && IsKeyPressed(KEY_BACKSPACE) && strlen(blocks_input) > 0) {
+        blocks_input[strlen(blocks_input) - 1] = '\0';
+    } else if (active_input == 1 && IsKeyPressed(KEY_BACKSPACE) && strlen(size_input) > 0) {
+        size_input[strlen(size_input) - 1] = '\0';
+    } else {
+        for (int i = 32; i < 128; i++) {
+            if (IsKeyPressed(i)) {
+                char str[2] = { (char)i, '\0' };
+                if (active_input == 0) strcat(blocks_input, str);
+                else strcat(size_input, str);
             }
         }
     }
 
-    Rectangle submit_button = { 350, 210, 100, 40 };
-    Color button_color = DARKBLUE;
+    // Button logic
+    Rectangle submit_button = { 300, 250, 200, 50 };
     if (CheckCollisionPointRec(GetMousePosition(), submit_button)) {
-        button_color = BLUE;
+        DrawRectangleRec(submit_button, DARKBLUE);
+        DrawText("Submit", 370, 265, 20, WHITE);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             *total_blocks = atoi(blocks_input);
             *block_size = atoi(size_input);
-
             if (*total_blocks > 0 && *block_size > 0) {
                 initialize_secondary_memory(sm, *total_blocks, *block_size);
                 *initialized = 1;
-
-                printf("Mémoire secondaire initialisée avec %d blocs de taille %d.\n", *total_blocks, *block_size);
+                *state = STATE_MAIN_MENU;
+                TransitionEffect(BLACK, 60); // Transition effect
             }
         }
+    } else {
+        DrawRectangleRec(submit_button, BLUE);
+        DrawText("Submit", 370, 265, 20, WHITE);
     }
 
-    DrawRectangleRec(submit_button, button_color);
-    DrawText("Soumettre", 375, 220, 20, WHITE);
-
-    if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){300, 90, 200, 40}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    // Switching inputs
+    if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){300, 110, 200, 40}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         active_input = 0;
-    } else if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){300, 150, 200, 40}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    } else if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){300, 170, 200, 40}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         active_input = 1;
     }
 }
 
-void ShowMainMenu(SecondaryMemory *sm, int *choice) {
-    const char *menu_options[] = {
-        "Create a file",
-        "Display Memory State",
-        "Display File Metadata",
-        "Search a Record by ID",
-        "Insert a New Record",
-        "Delete a Record",
-        "Defragment a File",
-        "Delete a File",
-        "Rename a File",
-        "Compact Memory",
-        "Clear Secondary Memory",
-        "Quit"
-    };
+// Main Menu
+void ShowMainMenu(AppState *state) {
+    DrawCenteredText("Main Menu", 50, 30, DARKBLUE);
 
-    DrawText("========== File System Simulator ==========", 50, 50, 20, BLACK);
-
-    for (int i = 0; i < 12; i++) {
-        Rectangle button = { 50, 100 + i * 40, 250, 30 };
+    const char *options[] = { "Create a File", "Search Record", "Display Memory State", "Exit" };
+    for (int i = 0; i < 4; i++) {
+        Rectangle button = { 200, 100 + i * 70, 400, 50 };
         if (CheckCollisionPointRec(GetMousePosition(), button)) {
-            DrawRectangleRec(button, BLUE);
-            DrawText(menu_options[i], 60, 100 + i * 40, 20, WHITE);
-
+            DrawRectangleRec(button, DARKBLUE);
+            DrawText(options[i], 250, 115 + i * 70, 20, WHITE);
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                *choice = i + 1;
+                switch (i) {
+                    case 0: *state = STATE_CREATE_FILE; break;
+                    case 1: *state = STATE_SEARCH_RECORD; break;
+                    case 2: *state = STATE_DISPLAY_MEMORY; break;
+                    case 3: *state = STATE_EXIT; break;
+                }
+                TransitionEffect(BLACK, 60);
             }
         } else {
-            DrawRectangleRec(button, LIGHTGRAY);
-            DrawText(menu_options[i], 60, 100 + i * 40, 20, BLACK);
+            DrawRectangleRec(button, BLUE);
+            DrawText(options[i], 250, 115 + i * 70, 20, WHITE);
         }
     }
-
-    switch (*choice) {
-        case 1:
-            create_file(sm);
-            break;
-        case 2:
-            display_memory_state(sm);
-            break;
-        case 3:
-            display_file_metadata(sm);
-            break;
-        case 4:
-            search_record(sm);
-            break;
-        case 5:
-            insert_record(sm);
-            break;
-        case 6:
-            delete_record(sm);
-            break;
-        case 7:
-            defragment_file(sm);
-            break;
-        case 8:
-            delete_file(sm);
-            break;
-        case 9:
-            rename_file(sm);
-            break;
-        case 10:
-            compact_memory(sm);
-            break;
-        case 11:
-            clear_memory(sm);
-            break;
-        case 12:
-            free_secondary_memory(sm);
-            CloseWindow();
-            break;
-        default:
-            printf("Invalid choice. Please try again.\n");
-    }
 }
+
+// Other Screens
+void ShowCreateFileScreen(AppState *state) {
+    DrawCenteredText("Create a File Screen (Under Development)", 200, 20, BLACK);
+    if (IsKeyPressed(KEY_BACKSPACE)) *state = STATE_MAIN_MENU;
+}
+
+void ShowSearchRecordScreen(AppState *state) {
+    DrawCenteredText("Search Record Screen (Under Development)", 200, 20, BLACK);
+    if (IsKeyPressed(KEY_BACKSPACE)) *state = STATE_MAIN_MENU;
+}
+
+void ShowDisplayMemoryScreen(AppState *state) {
+    DrawCenteredText("Display Memory State (Under Development)", 200, 20, BLACK);
+    if (IsKeyPressed(KEY_BACKSPACE)) *state = STATE_MAIN_MENU;
+}
+
+
+// gcc -o main main.c filesystem.c -lraylib -lopengl32 -lm -lgdi32
