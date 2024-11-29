@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "filesystem.h"
 
 typedef enum {
@@ -91,7 +92,6 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
     DrawText("Enter total blocks:", 450, 300, 20, BLACK);
     DrawText("Enter block size (bytes):", 450, 390, 20, BLACK);
 
-
     DrawRectangle(450, 310 + padding, inputWidth, inputHeight, LIGHTGRAY);
     DrawText(blocks_input, 460, 320 + padding, 20, BLACK);
 
@@ -131,12 +131,30 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
         DrawText("Submit", 560, 480 + padding, 20, WHITE);
     }
 
+    static float progress = 0.0f;
+    if (*initialized == 0 && *total_blocks == 0 && *block_size == 0) {
+
+        progress += 0.01f;
+        if (progress > 1.0f) progress = 0.0f;
+
+        int progressBarX = 450;
+        int progressBarY = 540 + padding;
+        int progressBarWidth = 300;
+        int progressBarHeight = 20;
+
+        DrawRectangle(progressBarX, progressBarY, progressBarWidth, progressBarHeight, LIGHTGRAY);
+
+        int progressWidth = progressBarWidth * progress;
+        DrawRectangle(progressBarX, progressBarY, progressWidth, progressBarHeight, BLUE);
+    }
+
     if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){450, 310 + padding, inputWidth, inputHeight}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         active_input = 0;
     } else if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){450, 400 + padding, inputWidth, inputHeight}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         active_input = 1;
     }
 }
+
 
 void ShowMainMenu(AppState *state) {
     DrawCenteredText("Main Menu", 50, 40, DARKBLUE);
