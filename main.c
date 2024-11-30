@@ -11,12 +11,23 @@ typedef enum {
     STATE_CREATE_FILE,
     STATE_SEARCH_RECORD,
     STATE_DISPLAY_MEMORY,
-    STATE_EXIT
+    STATE_EXIT,
+    STATE_DISPLAY_FILE_METADATA,
+    STATE_INSERT_NEW_RECORD,
+    STATE_DELETE_RECORD,
+    STATE_DEFRAGMENT_FILE,
+    STATE_DELETE_FILE,
+    STATE_RENAME_FILE,
+    STATE_COMPACT_MEMORY,
+    STATE_CLEAR_SECONDARY_MEMORY
 } AppState;
+
+#define MAX_INPUT_SIZE 128
+
 
 void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size, AppState *state);
 void ShowMainMenu(AppState *state);
-void ShowCreateFileScreen(AppState *state);
+void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state);
 void ShowSearchRecordScreen(AppState *state);
 void ShowDisplayMemoryScreen(AppState *state);
 void DrawCenteredText(const char *text, int y, int fontSize, Color color);
@@ -37,7 +48,7 @@ int main(void) {
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-        switch (state) {
+         switch (state) {
             case STATE_INITIALIZATION:
                 ShowInitializationScreen(&initialized, &sm, &total_blocks, &block_size, &state);
                 break;
@@ -45,7 +56,7 @@ int main(void) {
                 ShowMainMenu(&state);
                 break;
             case STATE_CREATE_FILE:
-                ShowCreateFileScreen(&state);
+                ShowCreateFileScreen(&sm, &state);
                 break;
             case STATE_SEARCH_RECORD:
                 ShowSearchRecordScreen(&state);
@@ -71,7 +82,27 @@ void DrawCenteredText(const char *text, int y, int fontSize, Color color) {
 
 void TransitionEffect(Color color, int frames) {
     for (int i = 0; i < frames; i++) {
-        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(color, (float)i / frames));
+        float progress = (float)i / (frames - 1);
+
+        ClearBackground(RAYWHITE);
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(color, progress));
+
+        int screenWidth = GetScreenWidth();
+        int screenHeight = GetScreenHeight();
+        int progressBarWidth = screenWidth / 2;
+        int progressBarHeight = 40;
+        int progressBarX = (screenWidth - progressBarWidth) / 2;
+        int progressBarY = (screenHeight - progressBarHeight) / 2;
+
+        DrawRectangle(progressBarX, progressBarY, progressBarWidth, progressBarHeight, LIGHTGRAY);
+
+        int progressWidth = progressBarWidth * progress;
+        DrawRectangle(progressBarX, progressBarY, progressWidth, progressBarHeight, BLUE);
+
+        char progressText[16];
+        snprintf(progressText, sizeof(progressText), "%d%%", (int)(progress * 100));
+        DrawText(progressText, progressBarX + progressBarWidth / 2 - MeasureText(progressText, 20) / 2, 
+                 progressBarY - 30, 20, BLACK);
         EndDrawing();
         BeginDrawing();
     }
@@ -155,7 +186,6 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
     }
 }
 
-
 void ShowMainMenu(AppState *state) {
     DrawCenteredText("Main Menu", 50, 40, DARKBLUE);
 
@@ -185,17 +215,112 @@ void ShowMainMenu(AppState *state) {
     }
 }
 
-void ShowCreateFileScreen(AppState *state) {
-    DrawCenteredText("Create a File Screen (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-    if (IsKeyPressed(KEY_BACKSPACE)) *state = STATE_MAIN_MENU;
+
+    
+void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
+    Color defaultColor = BLUE;
+    Color selectedColor = DARKBLUE;
+    static char filename[MAX_FILENAME] = "";
+    static char num_records_input[MAX_INPUT_SIZE] = "";
+    static int global_org_choice = 1;
+    static int internal_org_choice = 1;
+
+    bool showSuccess = false;
+    bool showError = false;
+
+    ClearBackground(RAYWHITE);
+    DrawText("Create New File", 450, 50, 30, BLACK);
+    DrawText("File Name:", 300, 150, 20, BLACK);
+    DrawRectangle(300, 180, 300, 30, LIGHTGRAY);
+    DrawText(filename, 305, 185, 20, BLACK);
+
+    DrawText("Number of Records:", 300, 230, 20, BLACK);
+    DrawRectangle(300, 260, 300, 30, LIGHTGRAY);
+    DrawText(num_records_input, 305, 265, 20, BLACK);
+    DrawText("Select Global Organization Mode:", 300, 310, 20, BLACK);
+    Rectangle contButton = {300, 340, 140, 30};
+    Rectangle chainButton = {450, 340, 140, 30};
+
+    if (global_org_choice == 1) {
+        DrawRectangleRec(contButton, selectedColor);
+    } else {
+        DrawRectangleRec(contButton, defaultColor);
+    }
+    DrawText("Contiguous", 315, 345, 20, WHITE);
+
+    if (global_org_choice == 2) {
+        DrawRectangleRec(chainButton, selectedColor);
+    } else {
+        DrawRectangleRec(chainButton, defaultColor);
+    }
+    DrawText("Chained", 465, 345, 20, WHITE);
+
+    DrawText("Select Internal Organization Mode:", 300, 390, 20, BLACK);
+    Rectangle unsortedButton = {300, 420, 140, 30};
+    Rectangle sortedButton = {450, 420, 140, 30};
+
+    if (internal_org_choice == 1) {
+        DrawRectangleRec(unsortedButton, selectedColor);
+    } else {
+        DrawRectangleRec(unsortedButton, defaultColor);
+    }
+    DrawText("Unsorted", 315, 425, 20, WHITE);
+
+    if (internal_org_choice == 2) {
+        DrawRectangleRec(sortedButton, selectedColor);
+    } else {
+        DrawRectangleRec(sortedButton, defaultColor);
+    }
+    DrawText("Sorted", 465, 425, 20, WHITE);
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        Vector2 mousePos = GetMousePosition();
+
+        if (CheckCollisionPointRec(mousePos, contButton)) {
+            global_org_choice = 1;
+        }
+        if (CheckCollisionPointRec(mousePos, chainButton)) {
+            global_org_choice = 2;
+        }
+        if (CheckCollisionPointRec(mousePos, unsortedButton)) {
+            internal_org_choice = 1;
+        }
+        if (CheckCollisionPointRec(mousePos, sortedButton)) {
+            internal_org_choice = 2;
+        }
+    }
+
+    Rectangle submitButton = {350, 480, 100, 40};
+    DrawRectangleRec(submitButton, GREEN);
+    DrawText("Submit", 375, 490, 20, WHITE);
+
+    if (CheckCollisionPointRec(GetMousePosition(), submitButton) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        if (filename[0] != '\0' && num_records_input[0] != '\0' && global_org_choice != 0 && internal_org_choice != 0) {
+            showSuccess = true;
+            showError = false;
+
+            create_file(sm, filename, atoi(num_records_input), global_org_choice, internal_org_choice);
+
+        } else {
+            showError = true;
+            showSuccess = false;
+        }
+    }
+
+    if (showSuccess) {
+        DrawText("File created successfully!", 450, 550, 20, GREEN);
+    } else if (showError) {
+        DrawText("Please fill in all the fields", 450, 550, 20, RED);
+    }
+
+    EndDrawing();
 }
 
+
 void ShowSearchRecordScreen(AppState *state) {
-    DrawCenteredText("Search Record Screen (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-    if (IsKeyPressed(KEY_BACKSPACE)) *state = STATE_MAIN_MENU;
+    DrawCenteredText("Search Record", 200, 40, DARKBLUE);
 }
 
 void ShowDisplayMemoryScreen(AppState *state) {
-    DrawCenteredText("Display Memory State (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-    if (IsKeyPressed(KEY_BACKSPACE)) *state = STATE_MAIN_MENU;
+    DrawCenteredText("Display Memory", 200, 40, DARKBLUE);
 }

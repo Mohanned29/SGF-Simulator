@@ -76,36 +76,14 @@ void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int bloc
 
     printf("Secondary memory initialized with %d blocks of size %d.\n", total_blocks, block_size);
 }
-
-void create_file(SecondaryMemory *sm) {
-    char filename[MAX_FILENAME];
-    int num_records;
-    int global_org_choice, internal_org_choice;
-    GlobalOrganization global_org;
-    InternalOrganization internal_org;
-
-    printf("Enter file name: ");
-    scanf("%s", filename);
+void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice) {
+    GlobalOrganization global_org = (global_org_choice == 1) ? CONTIGUOUS : CHAINED;
+    InternalOrganization internal_org = (internal_org_choice == 1) ? UNSORTED : SORTED;
 
     if (find_file(sm, filename) != NULL) {
         printf("File '%s' already exists.\n", filename);
         return;
     }
-
-    printf("Enter number of records: ");
-    scanf("%d", &num_records);
-    printf("Select global organization mode:\n");
-    printf("1. Contiguous\n");
-    printf("2. Chained\n");
-    printf("Choice: ");
-    scanf("%d", &global_org_choice);
-    global_org = (global_org_choice == 1) ? CONTIGUOUS : CHAINED;
-    printf("Select internal organization mode:\n");
-    printf("1. Unsorted\n");
-    printf("2. Sorted\n");
-    printf("Choice: ");
-    scanf("%d", &internal_org_choice);
-    internal_org = (internal_org_choice == 1) ? UNSORTED : SORTED;
 
     File *new_file = (File *)malloc(sizeof(File));
     strcpy(new_file->metadata.filename, filename);
@@ -122,16 +100,9 @@ void create_file(SecondaryMemory *sm) {
     }
     int blocks_needed = (num_records + records_per_block - 1) / records_per_block;
 
-    /*
-        when allocating contiguous space for a file
-        the code checks if enough blocks are available by looking for a sequence of free blocks
-        By adding a buffer (one extra block)
-        we ensure that even if a file grows
-        there is room to handle future changes or extensions without having to reallocate
-    */
     int blocks_allocated = 0;
     int first_block = -1;
-    int buffer_blocks_needed = blocks_needed + 1;  //add buffer block for potential expansion ( not checked )
+    int buffer_blocks_needed = blocks_needed + 1;
 
     if (global_org == CONTIGUOUS) {
         for (int i = 0; i <= sm->total_blocks - buffer_blocks_needed; i++) {
@@ -192,7 +163,6 @@ void create_file(SecondaryMemory *sm) {
     unsigned int index = hash_function(filename);
     new_file->next = sm->hash_table[index];
     sm->hash_table[index] = new_file;
-
     FILE *fp = fopen(filename, "w");
     if (fp == NULL) {
         printf("Error creating file '%s'.\n", filename);
@@ -215,6 +185,7 @@ void create_file(SecondaryMemory *sm) {
 
     printf("File '%s' created successfully.\n", filename);
 }
+
 
 void display_memory_state(SecondaryMemory *sm) {
     printf("\nMemory State:\n");
