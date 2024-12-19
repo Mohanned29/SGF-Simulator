@@ -1,5 +1,3 @@
-<a href="https://www.ultrahuman.com/ring/buy/?referral=1pauci" target="_blank"><img src="https://github.com/user-attachments/assets/3a3cf7e8-ebf2-48df-9e6d-5db67756e976" alt="Ultrahuman Ring Air Discount Code 2024"></a>
-
 <p align="center">
   <img width="200" src="https://user-images.githubusercontent.com/42001064/120057695-b1f6c680-c062-11eb-96d5-2c43d05f9018.png" alt="logo">
   <h1 align="center" style="margin: 0 auto 0 auto;">Tkinter Designer</h1>
@@ -18,22 +16,6 @@
 </p>
   <br>
 
-## Translations
-
-- [简体中文](/docs/README.zh-CN.md)
-- [Français](/docs/README.fr-FR.md)
-- [ગુજરાતી](/docs/README.gu-GU.md)
-- [हिन्दी](/docs/README.hin-HIN.md)
-- [Italiano](/docs/README.it-IT.md)
-- [عربية](/docs/README.ar-DZ.md)
-- [Turkish](/docs/README.tr-TR.md)
-- [Brazil](/docs/README.pt-BR.md)
-- [Spanish](/docs/README.spa-SPA.md)
-- [मराठी](/docs/README.mr-MR.md)
-- [Korean](/docs/README.kr-KR.md)
-- [Tiếng Việt](/docs/README.vi-VN.md)
-- [বাংলা](/docs/README.ban-BAN.md)
-- [Русский](/docs/README.ru-RU.md)
 
 ___
 
