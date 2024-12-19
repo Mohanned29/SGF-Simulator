@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include "filesystem.h"
+#define BUFFER_SIZE 512
 
 typedef enum {
     STATE_INITIALIZATION,
@@ -20,6 +21,8 @@ typedef enum {
     STATE_COMPACT_MEMORY,
     STATE_CLEAR_SECONDARY_MEMORY
 } AppState;
+
+
 #define MAX_INPUT_SIZE 128
 void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size, AppState *state);
 void ShowMainMenu(AppState *state);
@@ -28,6 +31,9 @@ void ShowSearchRecordScreen(AppState *state);
 void ShowDisplayMemoryScreen(AppState *state);
 void DrawCenteredText(const char *text, int y, int fontSize, Color color);
 void TransitionEffect(Color color, int frames);
+
+
+
 
 int main(void) {
     InitWindow(1200, 800, "File System Simulator");
@@ -78,7 +84,6 @@ void DrawCenteredText(const char *text, int y, int fontSize, Color color) {
     DrawText(text, (1200 - textWidth) / 2, y, fontSize, color);
 }
 
-
 void TransitionWithText(Color bgColor, Color textColor, int frames, const char *text) {
     int frameCount = 0; 
     while (frameCount < frames) {
@@ -103,10 +108,6 @@ void TransitionWithText(Color bgColor, Color textColor, int frames, const char *
         frameCount++;
     }
 }
-
-
-
-
 
 void TransitionEffect(Color color, int frames) {
     for (int i = 0; i < frames; i++) {
@@ -146,10 +147,6 @@ void TransitionEffect(Color color, int frames) {
     }
 }
 
-
-
-
-
 void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size, AppState *state) {
     static char blocks_input[10] = "\0";
     static char size_input[10] = "\0";
@@ -160,6 +157,7 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
     int buttonHeight = 60;
     int padding = 20;
 
+    static char error_message[100] = "\0";
     DrawCenteredText("Initialization Screen", 200, 50, DARKBLUE);
 
     DrawText("Enter total blocks:", 450, 300, 20, BLACK);
@@ -171,6 +169,7 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
     DrawRectangle(450, 400 + padding, inputWidth, inputHeight, LIGHTGRAY);
     DrawText(size_input, 460, 410 + padding, 20, BLACK);
 
+    // Handle input
     if (active_input == 0 && IsKeyPressed(KEY_BACKSPACE) && strlen(blocks_input) > 0) {
         blocks_input[strlen(blocks_input) - 1] = '\0';
     } else if (active_input == 1 && IsKeyPressed(KEY_BACKSPACE) && strlen(size_input) > 0) {
@@ -189,25 +188,30 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
     if (CheckCollisionPointRec(GetMousePosition(), submit_button)) {
         DrawRectangleRec(submit_button, DARKBLUE);
         DrawText("Submit", 560, 480 + padding, 20, WHITE);
+
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             *total_blocks = atoi(blocks_input);
             *block_size = atoi(size_input);
-            
-            if (*total_blocks > 0 && *block_size > 0) {
-                initialize_secondary_memory(sm, *total_blocks, *block_size);
+
+            if (*total_blocks <= 0 || *block_size <= 0) {
+                snprintf(error_message, sizeof(error_message), "Error: Both values must be positive integers.");
+            } else if (*block_size < sizeof(Record)) {
+                snprintf(error_message, sizeof(error_message), "Error: Block size (%d) too small for a record (%lu).", *block_size, sizeof(Record));
+            } else {
+                char *buffer = (char *)malloc(*total_blocks * *block_size);
+                //buffer 
+                initialize_secondary_memory(sm, *total_blocks, *block_size, buffer);
+                
                 *initialized = 1;
                 *state = STATE_MAIN_MENU;
                 TransitionEffect(WHITE, 60);
             }
-            
         }
-            
     } else {
         DrawRectangleRec(submit_button, BLUE);
         DrawText("Submit", 560, 480 + padding, 20, WHITE);
     }
 
-    
 
     if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){450, 310 + padding, inputWidth, inputHeight}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         active_input = 0;
@@ -215,8 +219,10 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
         active_input = 1;
     }
 
+    if (strlen(error_message) > 0) {
+        DrawText(error_message, 450, 550 + padding, 20, RED);
+    }
 }
-
 
 void ShowMainMenu(AppState *state) {
     DrawCenteredText("Main Menu", 50, 40, DARKBLUE);
@@ -276,12 +282,12 @@ void ShowMainMenu(AppState *state) {
     }
 }
 
-
-
 void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
     static char filename[MAX_FILENAME] = "";
     static char num_records_input[MAX_INPUT_SIZE] = "";
     static int active_input = 0; 
+
+    static char buffer[BUFFER_SIZE] = {0};
 
     Color defaultColor = BLUE;
     Color selectedColor = DARKBLUE;
@@ -294,107 +300,15 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
     ClearBackground(RAYWHITE);
     DrawText("Create New File", 450, 50, 30, BLACK);
 
-    
     DrawText("File Name:", 300, 150, 20, BLACK);
     Rectangle filenameField = {300, 180, 300, 30};
     DrawRectangleRec(filenameField, (active_input == 1) ? LIGHTGRAY : LIGHTGRAY);
     DrawText(filename, 305, 185, 20, BLACK);
 
-    
     DrawText("Number of Records:", 300, 230, 20, BLACK);
     Rectangle numRecordsField = {300, 260, 300, 30};
     DrawRectangleRec(numRecordsField, (active_input == 2) ? LIGHTGRAY : LIGHTGRAY);
     DrawText(num_records_input, 305, 265, 20, BLACK);
-
-    
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        Vector2 mousePos = GetMousePosition();
-        if (CheckCollisionPointRec(mousePos, filenameField)) {
-            active_input = 1;
-        } else if (CheckCollisionPointRec(mousePos, numRecordsField)) {
-            active_input = 2;
-        } else {
-            active_input = 0;
-        }
-    }
-
-    
-    if (active_input > 0) {
-        int key = GetCharPressed();
-        if (key >= 32 && key <= 126) {
-            if (active_input == 1 && strlen(filename) < MAX_FILENAME - 1) {
-                int len = strlen(filename);
-                filename[len] = (char)key;
-                filename[len + 1] = '\0';
-            } else if (active_input == 2 && strlen(num_records_input) < MAX_INPUT_SIZE - 1) {
-                int len = strlen(num_records_input);
-                num_records_input[len] = (char)key;
-                num_records_input[len + 1] = '\0';
-            }
-        }
-
-        if (IsKeyPressed(KEY_BACKSPACE)) {
-            if (active_input == 1 && strlen(filename) > 0) {
-                filename[strlen(filename) - 1] = '\0';
-            } else if (active_input == 2 && strlen(num_records_input) > 0) {
-                num_records_input[strlen(num_records_input) - 1] = '\0';
-            }
-        }
-    }
-
-    
-    DrawText("Select Global Organization Mode:", 300, 310, 20, BLACK);
-    Rectangle contButton = {300, 340, 140, 30};
-    Rectangle chainButton = {450, 340, 140, 30};
-
-    if (global_org_choice == 1) {
-        DrawRectangleRec(contButton, selectedColor);
-    } else {
-        DrawRectangleRec(contButton, defaultColor);
-    }
-    DrawText("Contiguous", 315, 345, 20, WHITE);
-
-    if (global_org_choice == 2) {
-        DrawRectangleRec(chainButton, selectedColor);
-    } else {
-        DrawRectangleRec(chainButton, defaultColor);
-    }
-    DrawText("Chained", 465, 345, 20, WHITE);
-
-    DrawText("Select Internal Organization Mode:", 300, 390, 20, BLACK);
-    Rectangle unsortedButton = {300, 420, 140, 30};
-    Rectangle sortedButton = {450, 420, 140, 30};
-
-    if (internal_org_choice == 1) {
-        DrawRectangleRec(unsortedButton, selectedColor);
-    } else {
-        DrawRectangleRec(unsortedButton, defaultColor);
-    }
-    DrawText("Unsorted", 315, 425, 20, WHITE);
-
-    if (internal_org_choice == 2) {
-        DrawRectangleRec(sortedButton, selectedColor);
-    } else {
-        DrawRectangleRec(sortedButton, defaultColor);
-    }
-    DrawText("Sorted", 465, 425, 20, WHITE);
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        Vector2 mousePos = GetMousePosition();
-
-        if (CheckCollisionPointRec(mousePos, contButton)) {
-            global_org_choice = 1;
-        }
-        if (CheckCollisionPointRec(mousePos, chainButton)) {
-            global_org_choice = 2;
-        }
-        if (CheckCollisionPointRec(mousePos, unsortedButton)) {
-            internal_org_choice = 1;
-        }
-        if (CheckCollisionPointRec(mousePos, sortedButton)) {
-            internal_org_choice = 2;
-        }
-    }
 
     Rectangle submitButton = {350, 480, 100, 40};
     DrawRectangleRec(submitButton, GREEN);
@@ -402,10 +316,11 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
 
     if (CheckCollisionPointRec(GetMousePosition(), submitButton) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (filename[0] != '\0' && num_records_input[0] != '\0' && global_org_choice != 0 && internal_org_choice != 0) {
+            // buuuuuuuuuuuuuuuuuuuffer whdakhor
+            create_file(sm, filename, atoi(num_records_input), global_org_choice, internal_org_choice, buffer);
+            
             showSuccess = true;
             showError = false;
-
-            create_file(sm, filename, atoi(num_records_input), global_org_choice, internal_org_choice);
         } else {
             showError = true;
             showSuccess = false;
@@ -413,17 +328,15 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
     }
 
     if (showSuccess) {
-       
-        
-        TransitionWithText(WHITE,GREEN,60,"File created succesfully!");
+        //buffer hna tan
+        TransitionWithText(WHITE, GREEN, 60, buffer);
     } else if (showError) {
         DrawText("Please fill in all the fields", 450, 550, 20, RED);
-       
     }
 
-       if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
+    if (IsKeyPressed(KEY_SPACE)){
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
     } 
 }
 

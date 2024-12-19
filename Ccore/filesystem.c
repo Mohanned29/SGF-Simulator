@@ -4,6 +4,10 @@
 #include <io.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+
+#define BUFFER_SIZE 512
+char buffer[BUFFER_SIZE];
 
 /*
 Steps :
@@ -25,6 +29,8 @@ Steps :
     - when you want to seach for a file, the same hash function is used fel hsab te3 el index, and the file is searched at that index
 */
 
+
+
 unsigned int hash_function(const char *filename) {
     unsigned int hash = 0;
     while (*filename) {
@@ -33,8 +39,7 @@ unsigned int hash_function(const char *filename) {
     return hash % HASH_TABLE_SIZE;
 }
 
-// recherche hachage for flex
-File* find_file(SecondaryMemory *sm, const char *filename) {
+File* find_file(SecondaryMemory *sm, const char *filename, char *buffer) {
     unsigned int index = hash_function(filename);
     File *file = sm->hash_table[index];
 
@@ -52,13 +57,14 @@ File* find_file(SecondaryMemory *sm, const char *filename) {
         }
         file = file->next;
     }
-    
+
     return NULL;
 }
 
-void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size) {
+void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size, char *buffer) {
     if (block_size < sizeof(Record)) {
-        printf("Error: Block size (%d bytes) is too small to hold a record (%lu bytes).\n", block_size, sizeof(Record));
+        snprintf(buffer, BUFFER_SIZE, "Error: Block size (%d bytes) is too small to hold a record (%lu bytes).\n", block_size, sizeof(Record));
+        printf("%s", buffer);
         return;
     }
 
@@ -74,14 +80,17 @@ void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int bloc
         sm->hash_table[i] = NULL;
     }
 
-    printf("Secondary memory initialized with %d blocks of size %d.\n", total_blocks, block_size);
+    snprintf(buffer, BUFFER_SIZE, "Secondary memory initialized with %d blocks of size %d.\n", total_blocks, block_size);
+    printf("%s", buffer);
 }
-void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice) {
+
+void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice, char *buffer) {
     GlobalOrganization global_org = (global_org_choice == 1) ? CONTIGUOUS : CHAINED;
     InternalOrganization internal_org = (internal_org_choice == 1) ? UNSORTED : SORTED;
 
-    if (find_file(sm, filename) != NULL) {
-        printf("File '%s' already exists.\n", filename);
+    if (find_file(sm, filename, buffer) != NULL) {
+        snprintf(buffer, BUFFER_SIZE, "File '%s' already exists.\n", filename);
+        printf("%s", buffer);
         return;
     }
 
@@ -94,35 +103,36 @@ void create_file(SecondaryMemory *sm, const char *filename, int num_records, int
 
     int records_per_block = sm->block_size / sizeof(Record);
     if (records_per_block == 0) {
-        printf("Error: Block size (%d bytes) is too small for a record (%lu bytes).\n", sm->block_size, sizeof(Record));
+        snprintf(buffer, BUFFER_SIZE, "Error: Block size (%d bytes) is too small for a record (%lu bytes).\n", sm->block_size, sizeof(Record));
+        printf("%s", buffer);
         free(new_file);
         return;
     }
-    int blocks_needed = (num_records + records_per_block - 1) / records_per_block;
 
+    int blocks_needed = (num_records + records_per_block - 1) / records_per_block;
     int blocks_allocated = 0;
     int first_block = -1;
-    int buffer_blocks_needed = blocks_needed + 1;
 
     if (global_org == CONTIGUOUS) {
-        for (int i = 0; i <= sm->total_blocks - buffer_blocks_needed; i++) {
+        for (int i = 0; i <= sm->total_blocks - blocks_needed; i++) {
             int j;
-            for (j = 0; j < buffer_blocks_needed; j++) {
+            for (j = 0; j < blocks_needed; j++) {
                 if (sm->allocation_table[i + j] != 0) {
                     break;
                 }
             }
-            if (j == buffer_blocks_needed) {
+            if (j == blocks_needed) {
                 first_block = i;
-                for (j = 0; j < buffer_blocks_needed; j++) {
+                for (j = 0; j < blocks_needed; j++) {
                     sm->allocation_table[i + j] = 1;
                 }
-                blocks_allocated = buffer_blocks_needed;
+                blocks_allocated = blocks_needed;
                 break;
             }
         }
         if (blocks_allocated == 0) {
-            printf("Not enough contiguous space available.\n");
+            snprintf(buffer, BUFFER_SIZE, "Not enough contiguous space available.\n");
+            printf("%s", buffer);
             free(new_file);
             return;
         }
@@ -135,7 +145,8 @@ void create_file(SecondaryMemory *sm, const char *filename, int num_records, int
             }
         }
         if (blocks_allocated < blocks_needed) {
-            printf("Not enough space available.\n");
+            snprintf(buffer, BUFFER_SIZE, "Not enough space available.\n");
+            printf("%s", buffer);
             for (int i = 0; i < blocks_allocated; i++) {
                 sm->allocation_table[block_addresses[i]] = 0;
             }
@@ -163,9 +174,11 @@ void create_file(SecondaryMemory *sm, const char *filename, int num_records, int
     unsigned int index = hash_function(filename);
     new_file->next = sm->hash_table[index];
     sm->hash_table[index] = new_file;
+
     FILE *fp = fopen(filename, "w");
     if (fp == NULL) {
-        printf("Error creating file '%s'.\n", filename);
+        snprintf(buffer, BUFFER_SIZE, "Error creating file '%s'.\n", filename);
+        printf("%s", buffer);
         if (global_org == CONTIGUOUS) {
             for (int i = first_block; i < first_block + blocks_allocated; i++) {
                 sm->allocation_table[i] = 0;
@@ -183,24 +196,22 @@ void create_file(SecondaryMemory *sm, const char *filename, int num_records, int
     }
     fclose(fp);
 
-    printf("File '%s' created successfully.\n", filename);
+    snprintf(buffer, BUFFER_SIZE, "File '%s' created successfully.\n", filename);
+    printf("%s", buffer);
 }
+
 
 
 void display_memory_state(SecondaryMemory *sm) {
     printf("\nMemory State:\n");
     for (int i = 0; i < sm->total_blocks; i++) {
-        if (sm->allocation_table[i] == 0) {
-            printf("[Block %d: Free] ", i);
-        } else {
-            printf("[Block %d: Occupied] ", i);
-        }
-        /*
-            heka rahi tthsb :
-                records_per_block = block_size / record_size
-                records_per_block = 512 / 260 ≈ 1.96 ( heda exemple lokan size of blocks is 512 , 260 = 256 + 4)
-        */
-        if ((i + 1) % 10 == 0) {
+        printf("[Block %d: %s] ", i, sm->allocation_table[i] == 0 ? "Free" : "Occupied");
+
+        // Calculate records per block for a block size of 512 and record size of 260 bytes (example).
+        // records_per_block = block_size / record_size
+        // records_per_block = 512 / 260 ≈ 1.96
+
+        if ((i + 1) % 10 == 0) { // Format output for better readability
             printf("\n");
         }
     }
@@ -226,13 +237,14 @@ void display_file_metadata(SecondaryMemory *sm) {
 void search_record(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
     int record_id;
-    File *file;
     Record record;
 
     printf("Enter file name: ");
     scanf("%s", filename);
 
-    file = find_file(sm, filename);
+    char buffer[BUFFER_SIZE];
+    File *file = find_file(sm, filename, buffer);
+
     if (file == NULL) {
         printf("File '%s' not found.\n", filename);
         return;
@@ -241,25 +253,53 @@ void search_record(SecondaryMemory *sm) {
     printf("Enter record ID to search: ");
     scanf("%d", &record_id);
 
-    FILE *fp = fopen(filename, "r");
+    FILE *fp = fopen(filename, "rb");
     if (fp == NULL) {
         printf("Error opening file '%s'.\n", filename);
         return;
     }
 
     fseek(fp, (record_id - 1) * sizeof(Record), SEEK_SET);
-    fread(&record, sizeof(Record), 1, fp);
+    if (fread(&record, sizeof(Record), 1, fp) == 1) {
+        printf("Record found: ID = %d, Data = %s\n", record.id, record.data);
+    } else {
+        printf("Record not found.\n");
+    }
     fclose(fp);
-
-    printf("Record found: ID = %d, Data = %s\n", record.id, record.data);
 }
+
+int find_free_block(SecondaryMemory *sm) {
+    for (int i = 0; i < sm->total_blocks; i++) {
+        if (sm->allocation_table[i] == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void update_memory_allocation(SecondaryMemory *sm, File *file) {
+    int records_per_block = sm->block_size / sizeof(Record);
+    int required_blocks = (file->metadata.size_in_records + records_per_block - 1) / records_per_block;
+
+    while (file->metadata.size_in_blocks < required_blocks) {
+        int block_to_allocate = find_free_block(sm);
+        if (block_to_allocate == -1) {
+            printf("No more free blocks available.\n");
+            return;
+        }
+        sm->allocation_table[block_to_allocate] = 1;
+        file->metadata.size_in_blocks++;
+    }
+}
+
 
 void insert_record(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
     printf("Enter the file name to insert into: ");
     scanf("%s", filename);
 
-    File *file = find_file(sm, filename);
+    File *file = find_file(sm, filename, buffer);
+
     if (file == NULL) {
         printf("File '%s' not found.\n", filename);
         return;
@@ -283,43 +323,13 @@ void insert_record(SecondaryMemory *sm) {
         return;
     }
 
-
     fclose(fp);
-
     file->metadata.size_in_records++;
-
-    int records_per_block = sm->block_size / sizeof(Record);
-    int total_blocks_used = (file->metadata.size_in_records + records_per_block - 1) / records_per_block;
-
-    if (total_blocks_used > file->metadata.size_in_blocks) {
-        if (file->metadata.global_org == CONTIGUOUS) {
-            int next_block = file->metadata.first_block_address + file->metadata.size_in_blocks;
-            if (next_block < sm->total_blocks && sm->allocation_table[next_block] == 0) {
-                sm->allocation_table[next_block] = 1;
-                file->metadata.size_in_blocks++;
-            } else {
-                printf("No more contiguous space available to expand the file.\n");
-                return;
-            }
-        } else if (file->metadata.global_org == CHAINED) {
-            int allocated = 0;
-            for (int i = 0; i < sm->total_blocks; i++) {
-                if (sm->allocation_table[i] == 0) {
-                    sm->allocation_table[i] = 1;
-                    file->metadata.size_in_blocks++;
-                    allocated = 1;
-                    break;
-                }
-            }
-            if (!allocated) {
-                printf("No more space available to expand the file.\n");
-                return;
-            }
-        }
-    }
+    update_memory_allocation(sm, file);
 
     printf("Record inserted successfully into file '%s'.\n", filename);
 }
+
 
 
 void delete_record(SecondaryMemory *sm) {
@@ -327,7 +337,8 @@ void delete_record(SecondaryMemory *sm) {
     int record_id;
     printf("Enter the file name: ");
     scanf("%s", filename);
-    File *file = find_file(sm, filename);
+
+    File *file = find_file(sm, filename, buffer);
     if (file == NULL) {
         printf("File '%s' not found.\n", filename);
         return;
@@ -342,7 +353,7 @@ void delete_record(SecondaryMemory *sm) {
         return;
     }
 
-    Record *records = (Record *)malloc(sizeof(Record) * file->metadata.size_in_records);
+    Record *records = malloc(sizeof(Record) * file->metadata.size_in_records);
     int count = 0;
     int found = 0;
 
@@ -372,11 +383,12 @@ void delete_record(SecondaryMemory *sm) {
     free(records);
 }
 
+
 void defragment_file(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
     printf("Enter the file name to defragment: ");
     scanf("%s", filename);
-    File *file = find_file(sm, filename);
+    File *file = find_file(sm, filename, buffer);
     if (file == NULL) {
         printf("File '%s' not found.\n", filename);
         return;
@@ -463,7 +475,7 @@ void rename_file(SecondaryMemory *sm) {
     char old_filename[MAX_FILENAME], new_filename[MAX_FILENAME];
     printf("Enter the current file name: ");
     scanf("%s", old_filename);
-    File *file = find_file(sm, old_filename);
+    File *file = find_file(sm, old_filename, buffer);
     if (file == NULL) {
         printf("File '%s' not found.\n", old_filename);
         return;
@@ -471,7 +483,7 @@ void rename_file(SecondaryMemory *sm) {
     printf("Enter the new file name: ");
     scanf("%s", new_filename);
 
-    if (find_file(sm, new_filename) != NULL) {
+    if (find_file(sm, new_filename,buffer) != NULL) {
         printf("A file with name '%s' already exists.\n", new_filename);
         return;
     }

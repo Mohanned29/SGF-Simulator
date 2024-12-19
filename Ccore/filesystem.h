@@ -51,8 +51,9 @@ typedef struct SecondaryMemory {
 } SecondaryMemory;
 
 
-void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size);
-void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice);
+void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size, char *buffer);
+void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice, char *buffer);
+File* find_file(SecondaryMemory *sm, const char *filename, char *buffer);
 void display_memory_state(SecondaryMemory *sm);
 void display_file_metadata(SecondaryMemory *sm);
 void search_record(SecondaryMemory *sm);
@@ -64,8 +65,6 @@ void rename_file(SecondaryMemory *sm);
 void compact_memory(SecondaryMemory *sm);
 void clear_memory(SecondaryMemory *sm);
 void free_secondary_memory(SecondaryMemory *sm);
-
 unsigned int hash_function(const char *filename);
-File* find_file(SecondaryMemory *sm, const char *filename);
 
 #endif
