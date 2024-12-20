@@ -291,8 +291,8 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
 
     Color defaultColor = BLUE;
     Color selectedColor = DARKBLUE;
-    static int global_org_choice = 1;
-    static int internal_org_choice = 1;
+    static int global_org_choice = 1; 
+    static int internal_org_choice = 1; 
 
     bool showSuccess = false;
     bool showError = false;
@@ -300,25 +300,119 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
     ClearBackground(RAYWHITE);
     DrawText("Create New File", 450, 50, 30, BLACK);
 
+  
     DrawText("File Name:", 300, 150, 20, BLACK);
     Rectangle filenameField = {300, 180, 300, 30};
     DrawRectangleRec(filenameField, (active_input == 1) ? LIGHTGRAY : LIGHTGRAY);
     DrawText(filename, 305, 185, 20, BLACK);
 
+   
     DrawText("Number of Records:", 300, 230, 20, BLACK);
     Rectangle numRecordsField = {300, 260, 300, 30};
     DrawRectangleRec(numRecordsField, (active_input == 2) ? LIGHTGRAY : LIGHTGRAY);
     DrawText(num_records_input, 305, 265, 20, BLACK);
 
+    
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        Vector2 mousePos = GetMousePosition();
+        if (CheckCollisionPointRec(mousePos, filenameField)) {
+            active_input = 1;
+        } else if (CheckCollisionPointRec(mousePos, numRecordsField)) {
+            active_input = 2;
+        } else {
+            active_input = 0;
+        }
+    }
+
+    if (active_input > 0) {
+        int key = GetCharPressed();
+        while (key > 0) { 
+            if (key >= 32 && key <= 126) {
+                if (active_input == 1 && strlen(filename) < MAX_FILENAME - 1) {
+                    int len = strlen(filename);
+                    filename[len] = (char)key;
+                    filename[len + 1] = '\0';
+                } else if (active_input == 2 && strlen(num_records_input) < MAX_INPUT_SIZE - 1) {
+                    int len = strlen(num_records_input);
+                    num_records_input[len] = (char)key;
+                    num_records_input[len + 1] = '\0';
+                }
+            }
+            key = GetCharPressed(); 
+        }
+
+        if (IsKeyPressed(KEY_BACKSPACE)) {
+            if (active_input == 1 && strlen(filename) > 0) {
+                filename[strlen(filename) - 1] = '\0';
+            } else if (active_input == 2 && strlen(num_records_input) > 0) {
+                num_records_input[strlen(num_records_input) - 1] = '\0';
+            }
+        }
+    }
+
+  
+    DrawText("Select Global Organization Mode:", 300, 310, 20, BLACK);
+    Rectangle contButton = {300, 340, 140, 30};
+    Rectangle chainButton = {450, 340, 140, 30};
+
+    if (global_org_choice == 1) {
+        DrawRectangleRec(contButton, selectedColor);
+    } else {
+        DrawRectangleRec(contButton, defaultColor);
+    }
+    DrawText("Contiguous", 315, 345, 20, WHITE);
+
+    if (global_org_choice == 2) {
+        DrawRectangleRec(chainButton, selectedColor);
+    } else {
+        DrawRectangleRec(chainButton, defaultColor);
+    }
+    DrawText("Chained", 465, 345, 20, WHITE);
+
+  
+    DrawText("Select Internal Organization Mode:", 300, 390, 20, BLACK);
+    Rectangle unsortedButton = {300, 420, 140, 30};
+    Rectangle sortedButton = {450, 420, 140, 30};
+
+    if (internal_org_choice == 1) {
+        DrawRectangleRec(unsortedButton, selectedColor);
+    } else {
+        DrawRectangleRec(unsortedButton, defaultColor);
+    }
+    DrawText("Unsorted", 315, 425, 20, WHITE);
+
+    if (internal_org_choice == 2) {
+        DrawRectangleRec(sortedButton, selectedColor);
+    } else {
+        DrawRectangleRec(sortedButton, defaultColor);
+    }
+    DrawText("Sorted", 465, 425, 20, WHITE);
+
+  
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        Vector2 mousePos = GetMousePosition();
+        if (CheckCollisionPointRec(mousePos, contButton)) {
+            global_org_choice = 1;
+        }
+        if (CheckCollisionPointRec(mousePos, chainButton)) {
+            global_org_choice = 2;
+        }
+        if (CheckCollisionPointRec(mousePos, unsortedButton)) {
+            internal_org_choice = 1;
+        }
+        if (CheckCollisionPointRec(mousePos, sortedButton)) {
+            internal_org_choice = 2;
+        }
+    }
+
+   
     Rectangle submitButton = {350, 480, 100, 40};
     DrawRectangleRec(submitButton, GREEN);
     DrawText("Submit", 375, 490, 20, WHITE);
 
     if (CheckCollisionPointRec(GetMousePosition(), submitButton) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (filename[0] != '\0' && num_records_input[0] != '\0' && global_org_choice != 0 && internal_org_choice != 0) {
-            // buuuuuuuuuuuuuuuuuuuffer whdakhor
             create_file(sm, filename, atoi(num_records_input), global_org_choice, internal_org_choice, buffer);
-            
             showSuccess = true;
             showError = false;
         } else {
@@ -327,18 +421,20 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
         }
     }
 
+
     if (showSuccess) {
-        //buffer hna tan
         TransitionWithText(WHITE, GREEN, 60, buffer);
     } else if (showError) {
         DrawText("Please fill in all the fields", 450, 550, 20, RED);
     }
 
-    if (IsKeyPressed(KEY_SPACE)){
+    
+    if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
-    } 
+    }
 }
+
 
 
 void ShowSearchRecordScreen(AppState *state) {
