@@ -29,6 +29,7 @@ void ShowMainMenu(AppState *state);
 void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state);
 void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm);
 void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm);
+void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm);
 void DrawCenteredText(const char *text, int y, int fontSize, Color color);
 void TransitionEffect(Color color, int frames);
 void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm);
@@ -68,8 +69,10 @@ int main(void) {
             case STATE_DISPLAY_MEMORY:
                 ShowDisplayMemoryScreen(&state, &sm);
                 break;
-            
-            
+            case STATE_INSERT_NEW_RECORD:
+                ShowInsertNewRecordScreen(&state, &sm);
+                break;
+
             default:
                 break;
         }
@@ -676,13 +679,143 @@ void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm) {
 }
 
 
-void ShowInsertNewRecordScreen(AppState *state) {
-    DrawCenteredText("Insert New Record (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-    if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    } 
+void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
+    static char filename[MAX_FILENAME] = "";
+    static char record_id[32] = "";
+    static char record_data[256] = "";
+    static int active_input = 0;
+    static bool showError = false;
+    static bool showSuccess = false;
+    static char message[256] = "";
+    
+    // Title
+    DrawCenteredText("Insert New Record", 50, 40, DARKBLUE);
+    
+    // Input Fields
+    int inputWidth = 300;
+    int inputHeight = 40;
+    int startY = 150;
+    
+    // Filename Input
+    DrawText("Enter File Name:", 450, startY, 20, BLACK);
+    Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
+    DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(filenameBox, 2, BLUE);
+    DrawText(filename, 460, startY + 40, 20, BLACK);
+    
+    // Record ID Input
+    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
+    Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
+    DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(idBox, 2, BLUE);
+    DrawText(record_id, 460, startY + 140, 20, BLACK);
+    
+    // Record Data Input
+    DrawText("Enter Record Data:", 450, startY + 200, 20, BLACK);
+    Rectangle dataBox = {450, startY + 230, inputWidth, inputHeight};
+    DrawRectangleRec(dataBox, (active_input == 3) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(dataBox, 2, BLUE);
+    DrawText(record_data, 460, startY + 240, 20, BLACK);
+    
+    // Handle Input Selection
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) active_input = 1;
+        else if (CheckCollisionPointRec(GetMousePosition(), idBox)) active_input = 2;
+        else if (CheckCollisionPointRec(GetMousePosition(), dataBox)) active_input = 3;
+        else active_input = 0;
+    }
+    
+    // Handle Text Input
+    if (active_input > 0) {
+        int key = GetCharPressed();
+        char *currentInput = (active_input == 1) ? filename : 
+                           (active_input == 2) ? record_id : record_data;
+        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 
+                    (active_input == 2) ? 31 : 255;
+        
+        while (key > 0) {
+            if ((key >= 32 && key <= 126) && strlen(currentInput) < maxLen) {
+                int len = strlen(currentInput);
+                currentInput[len] = (char)key;
+                currentInput[len + 1] = '\0';
+            }
+            key = GetCharPressed();
+        }
+        
+        if (IsKeyPressed(KEY_BACKSPACE) && strlen(currentInput) > 0) {
+            currentInput[strlen(currentInput) - 1] = '\0';
+        }
+    }
+    
+    // Submit Button
+    Rectangle submitBtn = {450, startY + 300, inputWidth, 50};
+    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), submitBtn);
+    DrawRectangleRec(submitBtn, btnHovered ? DARKBLUE : BLUE);
+    DrawText("Insert Record", 520, startY + 315, 20, WHITE);
+    
+    // Handle Submit
+    if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (strlen(filename) > 0 && strlen(record_id) > 0 && strlen(record_data) > 0) {
+            char buffer[BUFFER_SIZE];
+            File *file = find_file(sm, filename, buffer);
+            
+            if (file != NULL) {
+                FILE *fp = fopen(filename, "ab");
+                if (fp != NULL) {
+                    Record new_record;
+                    new_record.id = atoi(record_id);
+                    strncpy(new_record.data, record_data, 255);
+                    new_record.data[255] = '\0';
+                    
+                    if (fwrite(&new_record, sizeof(Record), 1, fp) == 1) {
+                        file->metadata.size_in_records++;
+                        update_memory_allocation(sm, file);
+                        showSuccess = true;
+                        showError = false;
+                        strcpy(message, "Record inserted successfully!");
+                        
+                        // Clear inputs
+                        filename[0] = '\0';
+                        record_id[0] = '\0';
+                        record_data[0] = '\0';
+                    } else {
+                        showError = true;
+                        showSuccess = false;
+                        strcpy(message, "Error writing record to file.");
+                    }
+                    fclose(fp);
+                } else {
+                    showError = true;
+                    showSuccess = false;
+                    strcpy(message, "Error opening file.");
+                }
+            } else {
+                showError = true;
+                showSuccess = false;
+                strcpy(message, "File not found.");
+            }
+        } else {
+            showError = true;
+            showSuccess = false;
+            strcpy(message, "Please fill all fields.");
+        }
+    }
+    
+    // Display Messages
+    if (showSuccess) {
+        DrawText(message, 450, startY + 370, 20, GREEN);
+    } else if (showError) {
+        DrawText(message, 450, startY + 370, 20, RED);
+    }
+    
+    // Return to Main Menu
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
 }
+
+
 
 void ShowDeleteRecordScreen(AppState *state) {
     DrawCenteredText("Delete Record (Under Development)", GetScreenHeight() / 2, 20, BLACK);

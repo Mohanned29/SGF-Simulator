@@ -66,5 +66,7 @@ void compact_memory(SecondaryMemory *sm);
 void clear_memory(SecondaryMemory *sm);
 void free_secondary_memory(SecondaryMemory *sm);
 unsigned int hash_function(const char *filename);
+void update_memory_allocation(SecondaryMemory *sm, File *file);
+
 
 #endif
