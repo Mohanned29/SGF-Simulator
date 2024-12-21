@@ -27,12 +27,11 @@ typedef enum {
 void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size, AppState *state);
 void ShowMainMenu(AppState *state);
 void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state);
-void ShowSearchRecordScreen(AppState *state);
+void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm);
 void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm);
 void DrawCenteredText(const char *text, int y, int fontSize, Color color);
 void TransitionEffect(Color color, int frames);
-
-
+void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm);
 
 
 int main(void) {
@@ -54,6 +53,9 @@ int main(void) {
             case STATE_INITIALIZATION:
                 ShowInitializationScreen(&initialized, &sm, &total_blocks, &block_size, &state);
                 break;
+            case STATE_DISPLAY_FILE_METADATA:
+                ShowDisplayFileMetadataScreen(&state, &sm);
+                break;
             case STATE_MAIN_MENU:
                 ShowMainMenu(&state);
                 break;
@@ -61,7 +63,7 @@ int main(void) {
                 ShowCreateFileScreen(&sm,&state);
                 break;
             case STATE_SEARCH_RECORD:
-                ShowSearchRecordScreen(&state);
+                ShowSearchRecordScreen(&state, &sm);
                 break;
             case STATE_DISPLAY_MEMORY:
                 ShowDisplayMemoryScreen(&state, &sm);
@@ -435,52 +437,164 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
     }
 }
 
-
-
-void ShowSearchRecordScreen(AppState *state) {
-    DrawCenteredText("Search Record Screen (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-     if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    } 
+void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
+    static char filename[MAX_FILENAME] = "";
+    static char record_id_input[10] = "";
+    static int active_input = 0;
+    static bool showResult = false;
+    static bool showError = false;
+    static Record found_record;
+    static char message[100] = "";
+    static float searchAnimation = 0.0f;
+    
+    // Title
+    DrawCenteredText("Search Record", 50, 40, DARKBLUE);
+    
+    // Input Fields
+    int inputWidth = 300;
+    int inputHeight = 40;
+    int startY = 150;
+    
+    // Filename Input
+    DrawText("Enter File Name:", 450, startY, 20, BLACK);
+    Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
+    DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(filenameBox, 2, BLUE);
+    DrawText(filename, 460, startY + 40, 20, BLACK);
+    
+    // Record ID Input
+    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
+    Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
+    DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(idBox, 2, BLUE);
+    DrawText(record_id_input, 460, startY + 140, 20, BLACK);
+    
+    // Handle Input Selection
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) active_input = 1;
+        else if (CheckCollisionPointRec(GetMousePosition(), idBox)) active_input = 2;
+        else active_input = 0;
+    }
+    
+    // Handle Text Input
+    if (active_input > 0) {
+        int key = GetCharPressed();
+        char *currentInput = (active_input == 1) ? filename : record_id_input;
+        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 9;
+        
+        while (key > 0) {
+            if ((key >= 32 && key <= 126) && strlen(currentInput) < maxLen) {
+                int len = strlen(currentInput);
+                currentInput[len] = (char)key;
+                currentInput[len + 1] = '\0';
+            }
+            key = GetCharPressed();
+        }
+        
+        if (IsKeyPressed(KEY_BACKSPACE) && strlen(currentInput) > 0) {
+            currentInput[strlen(currentInput) - 1] = '\0';
+        }
+    }
+    
+    // Search Button
+    Rectangle searchBtn = {450, startY + 200, inputWidth, 50};
+    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), searchBtn);
+    DrawRectangleRec(searchBtn, btnHovered ? DARKBLUE : BLUE);
+    DrawText("Search Record", 520, startY + 215, 20, WHITE);
+    
+    // Handle Search
+    if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        char buffer[BUFFER_SIZE];
+        File *file = find_file(sm, filename, buffer);
+        
+        if (file == NULL) {
+            showError = true;
+            showResult = false;
+            strcpy(message, "File not found!");
+        } else {
+            FILE *fp = fopen(filename, "rb");
+            if (fp == NULL) {
+                showError = true;
+                showResult = false;
+                strcpy(message, "Error opening file!");
+            } else {
+                int record_id = atoi(record_id_input);
+                fseek(fp, (record_id - 1) * sizeof(Record), SEEK_SET);
+                if (fread(&found_record, sizeof(Record), 1, fp) == 1) {
+                    showResult = true;
+                    showError = false;
+                } else {
+                    showError = true;
+                    showResult = false;
+                    strcpy(message, "Record not found!");
+                }
+                fclose(fp);
+            }
+        }
+        searchAnimation = 0.0f;
+    }
+    
+    // Animate Search Result
+    if (showResult || showError) {
+        searchAnimation += GetFrameTime() * 2;
+        if (searchAnimation > 1.0f) searchAnimation = 1.0f;
+        
+        float alpha = searchAnimation;
+        Rectangle resultBox = {350, startY + 280, 500, 100};
+        DrawRectangleRec(resultBox, Fade(LIGHTGRAY, 0.3f));
+        DrawRectangleLinesEx(resultBox, 2, BLUE);
+        
+        if (showResult) {
+            char resultText[100];
+            snprintf(resultText, sizeof(resultText), "Record ID: %d", found_record.id);
+            DrawText(resultText, 370, startY + 300, 20, Fade(BLACK, alpha));
+            DrawText(found_record.data, 370, startY + 330, 20, Fade(BLACK, alpha));
+        } else {
+            DrawText(message, 370, startY + 315, 20, Fade(RED, alpha));
+        }
+    }
+    
+    // Return to Main Menu
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
 }
 
+
 void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
-    // Title
     DrawCenteredText("Memory State", 50, 40, DARKBLUE);
     
-    // Calculate display parameters
+    //calculate display parameters
     int blockSize = 50;
     int padding = 10;
     int blocksPerRow = 10;
     int startX = (GetScreenWidth() - (blocksPerRow * (blockSize + padding))) / 2;
     int startY = 150;
     
-    // Display block information
+    //display block information
     for (int i = 0; i < sm->total_blocks; i++) {
         int row = i / blocksPerRow;
         int col = i % blocksPerRow;
         int x = startX + col * (blockSize + padding);
         int y = startY + row * (blockSize + padding);
         
-        // Draw block rectangle
+        //drawing block rectangle
         Color blockColor = sm->allocation_table[i] == 0 ? GREEN : RED;
         DrawRectangle(x, y, blockSize, blockSize, blockColor);
         
-        // Draw block number
+        //drawing block number
         char blockNum[5];
         snprintf(blockNum, sizeof(blockNum), "%d", i);
         int textWidth = MeasureText(blockNum, 20);
         DrawText(blockNum, x + (blockSize - textWidth)/2, y + blockSize/3, 20, WHITE);
     }
     
-    // Draw legend
     DrawRectangle(startX, startY - 60, 20, 20, GREEN);
     DrawText("Free", startX + 30, startY - 60, 20, BLACK);
     DrawRectangle(startX + 150, startY - 60, 20, 20, RED);
     DrawText("Occupied", startX + 180, startY - 60, 20, BLACK);
-    
-    // Statistics
+
     int occupiedBlocks = 0;
     for (int i = 0; i < sm->total_blocks; i++) {
         if (sm->allocation_table[i] == 1) occupiedBlocks++;
@@ -501,13 +615,66 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
-void ShowDisplayFileMetadataScreen(AppState *state) {
-    DrawCenteredText("Display File Metadata (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-     if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    } 
+void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm) {
+    DrawCenteredText("File Metadata", 50, 40, DARKBLUE);
+    
+    const int startY = 120;
+    const int rowHeight = 40;
+    const int colWidth = 160;
+    const int startX = 100;
+    
+    DrawText("Filename", startX, startY, 20, BLACK);
+    DrawText("Size(Blocks)", startX + colWidth, startY, 20, BLACK);
+    DrawText("Size(Records)", startX + colWidth * 2, startY, 20, BLACK);
+    DrawText("First Block", startX + colWidth * 3, startY, 20, BLACK);
+    DrawText("Global Org", startX + colWidth * 4, startY, 20, BLACK);
+    DrawText("Internal Org", startX + colWidth * 5, startY, 20, BLACK);
+
+    DrawLine(startX, startY + 30, startX + colWidth * 6 - 60, startY + 30, DARKGRAY);
+
+    File *current = sm->file_list;
+    int row = 0;
+    
+    while (current != NULL && row < 12) {  //limit to prevent overflow (balak hna)
+        int yPos = startY + 50 + (row * rowHeight);
+        
+        DrawText(current->metadata.filename, 
+                startX, yPos, 18, DARKGRAY);
+        
+        char blocks[10], records[10], first_block[10];
+        snprintf(blocks, sizeof(blocks), "%d", current->metadata.size_in_blocks);
+        snprintf(records, sizeof(records), "%d", current->metadata.size_in_records);
+        snprintf(first_block, sizeof(first_block), "%d", current->metadata.first_block_address);
+        
+        DrawText(blocks, 
+                startX + colWidth, yPos, 18, DARKGRAY);
+        DrawText(records, 
+                startX + colWidth * 2, yPos, 18, DARKGRAY);
+        DrawText(first_block, 
+                startX + colWidth * 3, yPos, 18, DARKGRAY);
+        DrawText(current->metadata.global_org == CONTIGUOUS ? "Contiguous" : "Chained", 
+                startX + colWidth * 4, yPos, 18, DARKGRAY);
+        DrawText(current->metadata.internal_org == SORTED ? "Sorted" : "Unsorted", 
+                startX + colWidth * 5, yPos, 18, DARKGRAY);
+        
+        current = current->next;
+        row++;
+    }
+    
+    DrawRectangleLinesEx((Rectangle){startX - 10, startY - 10, 
+                                   colWidth * 6 - 40, 
+                                   rowHeight * (row + 1) + 30}, 2, BLUE);
+    
+    DrawText("Press SPACE to return to main menu", 
+             GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2, 
+             GetScreenHeight() - 50, 20, DARKGRAY);
+    
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
 }
+
 
 void ShowInsertNewRecordScreen(AppState *state) {
     DrawCenteredText("Insert New Record (Under Development)", GetScreenHeight() / 2, 20, BLACK);
