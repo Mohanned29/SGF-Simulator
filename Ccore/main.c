@@ -28,7 +28,7 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
 void ShowMainMenu(AppState *state);
 void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state);
 void ShowSearchRecordScreen(AppState *state);
-void ShowDisplayMemoryScreen(AppState *state);
+void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm);
 void DrawCenteredText(const char *text, int y, int fontSize, Color color);
 void TransitionEffect(Color color, int frames);
 
@@ -64,7 +64,7 @@ int main(void) {
                 ShowSearchRecordScreen(&state);
                 break;
             case STATE_DISPLAY_MEMORY:
-                ShowDisplayMemoryScreen(&state);
+                ShowDisplayMemoryScreen(&state, &sm);
                 break;
             
             
@@ -245,10 +245,10 @@ void ShowMainMenu(AppState *state) {
 
     int totalOptions = sizeof(options) / sizeof(options[0]);
 
-   
+
     int buttonWidth = 400;
-    int buttonHeight = 40; 
-    int spacing = 10;      
+    int buttonHeight = 40;
+    int spacing = 10;
     int totalHeight = totalOptions * buttonHeight + (totalOptions - 1) * spacing;
     int startY = (GetScreenHeight() - totalHeight) / 2;
 
@@ -445,13 +445,62 @@ void ShowSearchRecordScreen(AppState *state) {
     } 
 }
 
-void ShowDisplayMemoryScreen(AppState *state) {
-    DrawCenteredText("Display Memory State (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-    if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    }     
+void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
+    // Title
+    DrawCenteredText("Memory State", 50, 40, DARKBLUE);
+    
+    // Calculate display parameters
+    int blockSize = 50;
+    int padding = 10;
+    int blocksPerRow = 10;
+    int startX = (GetScreenWidth() - (blocksPerRow * (blockSize + padding))) / 2;
+    int startY = 150;
+    
+    // Display block information
+    for (int i = 0; i < sm->total_blocks; i++) {
+        int row = i / blocksPerRow;
+        int col = i % blocksPerRow;
+        int x = startX + col * (blockSize + padding);
+        int y = startY + row * (blockSize + padding);
+        
+        // Draw block rectangle
+        Color blockColor = sm->allocation_table[i] == 0 ? GREEN : RED;
+        DrawRectangle(x, y, blockSize, blockSize, blockColor);
+        
+        // Draw block number
+        char blockNum[5];
+        snprintf(blockNum, sizeof(blockNum), "%d", i);
+        int textWidth = MeasureText(blockNum, 20);
+        DrawText(blockNum, x + (blockSize - textWidth)/2, y + blockSize/3, 20, WHITE);
+    }
+    
+    // Draw legend
+    DrawRectangle(startX, startY - 60, 20, 20, GREEN);
+    DrawText("Free", startX + 30, startY - 60, 20, BLACK);
+    DrawRectangle(startX + 150, startY - 60, 20, 20, RED);
+    DrawText("Occupied", startX + 180, startY - 60, 20, BLACK);
+    
+    // Statistics
+    int occupiedBlocks = 0;
+    for (int i = 0; i < sm->total_blocks; i++) {
+        if (sm->allocation_table[i] == 1) occupiedBlocks++;
+    }
+    
+    char stats[100];
+    snprintf(stats, sizeof(stats), "Total Blocks: %d | Occupied: %d | Free: %d", 
+             sm->total_blocks, occupiedBlocks, sm->total_blocks - occupiedBlocks);
+    DrawText(stats, startX, startY - 100, 20, BLACK);
+
+    DrawText("Press SPACE to return to main menu",
+             GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2, 
+             GetScreenHeight() - 50, 20, DARKGRAY);
+    
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
 }
+
 void ShowDisplayFileMetadataScreen(AppState *state) {
     DrawCenteredText("Display File Metadata (Under Development)", GetScreenHeight() / 2, 20, BLACK);
      if (IsKeyPressed(KEY_SPACE)){
