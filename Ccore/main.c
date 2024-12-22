@@ -94,85 +94,64 @@ int main(void) {
                 ShowDefragmentFileScreen(&state, &sm);
                 break;
 
-
             default:
                 break;
         }
-
         EndDrawing();
     }
-
     CloseWindow();
     return 0;
 }
+
 
 void DrawCenteredText(const char *text, int y, int fontSize, Color color) {
     int textWidth = MeasureText(text, fontSize);
     DrawText(text, (1200 - textWidth) / 2, y, fontSize, color);
 }
 
+
 void TransitionWithText(Color bgColor, Color textColor, int frames, const char *text) {
     int frameCount = 0; 
     while (frameCount < frames) {
         BeginDrawing();
         ClearBackground(bgColor); 
-
-        
         float alpha = (float)frameCount / frames;
         if (alpha > 0.5f) alpha = 1.0f - alpha; 
         alpha *= 2.0f; 
-        
-        
         Color blendedTextColor = (Color){
             textColor.r, textColor.g, textColor.b, (unsigned char)(255 * alpha)};
         
-        
         DrawText(text, GetScreenWidth() / 2 - MeasureText(text, 20) / 2, 
                  GetScreenHeight() / 2, 40, blendedTextColor);
-
         EndDrawing();
-
         frameCount++;
     }
 }
+
 
 void TransitionEffect(Color color, int frames) {
     for (int i = 0; i < frames; i++) {
         
         float progress = (float)i / (frames - 1);
-
-       
         ClearBackground(RAYWHITE); 
         DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(color, progress));
-
-        
         int screenWidth = GetScreenWidth();
         int screenHeight = GetScreenHeight();
-
-       
-        int progressBarWidth = screenWidth / 2; 
-        int progressBarHeight = 40;             
+        int progressBarWidth = screenWidth / 2;
+        int progressBarHeight = 40;
         int progressBarX = (screenWidth - progressBarWidth) / 2;
-        int progressBarY = (screenHeight - progressBarHeight) / 2; 
-
-        
+        int progressBarY = (screenHeight - progressBarHeight) / 2;
         DrawRectangle(progressBarX, progressBarY, progressBarWidth, progressBarHeight, LIGHTGRAY);
-
-        
         int progressWidth = progressBarWidth * progress;
         DrawRectangle(progressBarX, progressBarY, progressWidth, progressBarHeight, BLUE);
-
-        
         char progressText[16];
         snprintf(progressText, sizeof(progressText), "%d%%", (int)(progress * 100));
-        DrawText(progressText, progressBarX + progressBarWidth / 2 - MeasureText(progressText, 20) / 2, 
-                 progressBarY - 30, 20, BLACK);
-
-        
+        DrawText(progressText, progressBarX + progressBarWidth / 2 - MeasureText(progressText, 20) / 2, progressBarY - 30, 20, BLACK);
         EndDrawing();
         BeginDrawing();
     }
 }
+
 
 void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_blocks, int *block_size, AppState *state) {
     static char blocks_input[10] = "\0";
@@ -196,7 +175,6 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
     DrawRectangle(450, 400 + padding, inputWidth, inputHeight, LIGHTGRAY);
     DrawText(size_input, 460, 410 + padding, 20, BLACK);
 
-    // Handle input
     if (active_input == 0 && IsKeyPressed(KEY_BACKSPACE) && strlen(blocks_input) > 0) {
         blocks_input[strlen(blocks_input) - 1] = '\0';
     } else if (active_input == 1 && IsKeyPressed(KEY_BACKSPACE) && strlen(size_input) > 0) {
@@ -210,12 +188,10 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
             }
         }
     }
-
     Rectangle submit_button = { 450, 460 + padding, inputWidth, buttonHeight };
     if (CheckCollisionPointRec(GetMousePosition(), submit_button)) {
         DrawRectangleRec(submit_button, DARKBLUE);
         DrawText("Submit", 560, 480 + padding, 20, WHITE);
-
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             *total_blocks = atoi(blocks_input);
             *block_size = atoi(size_input);
@@ -226,9 +202,8 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
                 snprintf(error_message, sizeof(error_message), "Error: Block size (%d) too small for a record (%lu).", *block_size, sizeof(Record));
             } else {
                 char *buffer = (char *)malloc(*total_blocks * *block_size);
-                //buffer 
+                //buffer
                 initialize_secondary_memory(sm, *total_blocks, *block_size, buffer);
-                
                 *initialized = 1;
                 *state = STATE_MAIN_MENU;
                 TransitionEffect(WHITE, 60);
@@ -238,23 +213,20 @@ void ShowInitializationScreen(int *initialized, SecondaryMemory *sm, int *total_
         DrawRectangleRec(submit_button, BLUE);
         DrawText("Submit", 560, 480 + padding, 20, WHITE);
     }
-
-
     if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){450, 310 + padding, inputWidth, inputHeight}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         active_input = 0;
     } else if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){450, 400 + padding, inputWidth, inputHeight}) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         active_input = 1;
     }
-
     if (strlen(error_message) > 0) {
         DrawText(error_message, 450, 550 + padding, 20, RED);
     }
 }
 
+
 void ShowMainMenu(AppState *state) {
     DrawCenteredText("Main Menu", 50, 40, DARKBLUE);
 
-   
     const char *options[] = {
         "Create File",
         "Display Memory State",
@@ -269,16 +241,12 @@ void ShowMainMenu(AppState *state) {
         "Clear Secondary Memory",
         "Exit"
     };
-
     int totalOptions = sizeof(options) / sizeof(options[0]);
-
-
     int buttonWidth = 400;
     int buttonHeight = 40;
     int spacing = 10;
     int totalHeight = totalOptions * buttonHeight + (totalOptions - 1) * spacing;
     int startY = (GetScreenHeight() - totalHeight) / 2;
-
     for (int i = 0; i < totalOptions; i++) {
         Rectangle button = { (1200 - buttonWidth) / 2, startY + i * (buttonHeight + spacing), buttonWidth, buttonHeight };
         if (CheckCollisionPointRec(GetMousePosition(), button)) {
@@ -309,37 +277,31 @@ void ShowMainMenu(AppState *state) {
     }
 }
 
+
 void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
     static char filename[MAX_FILENAME] = "";
     static char num_records_input[MAX_INPUT_SIZE] = "";
     static int active_input = 0; 
-
     static char buffer[BUFFER_SIZE] = {0};
-
     Color defaultColor = BLUE;
     Color selectedColor = DARKBLUE;
     static int global_org_choice = 1; 
     static int internal_org_choice = 1; 
-
     bool showSuccess = false;
     bool showError = false;
-
     ClearBackground(RAYWHITE);
     DrawText("Create New File", 450, 50, 30, BLACK);
 
-  
     DrawText("File Name:", 300, 150, 20, BLACK);
     Rectangle filenameField = {300, 180, 300, 30};
     DrawRectangleRec(filenameField, (active_input == 1) ? LIGHTGRAY : LIGHTGRAY);
     DrawText(filename, 305, 185, 20, BLACK);
 
-   
     DrawText("Number of Records:", 300, 230, 20, BLACK);
     Rectangle numRecordsField = {300, 260, 300, 30};
     DrawRectangleRec(numRecordsField, (active_input == 2) ? LIGHTGRAY : LIGHTGRAY);
     DrawText(num_records_input, 305, 265, 20, BLACK);
 
-    
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         Vector2 mousePos = GetMousePosition();
         if (CheckCollisionPointRec(mousePos, filenameField)) {
@@ -350,7 +312,6 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
             active_input = 0;
         }
     }
-
     if (active_input > 0) {
         int key = GetCharPressed();
         while (key > 0) { 
@@ -376,8 +337,6 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
             }
         }
     }
-
-  
     DrawText("Select Global Organization Mode:", 300, 310, 20, BLACK);
     Rectangle contButton = {300, 340, 140, 30};
     Rectangle chainButton = {450, 340, 140, 30};
@@ -395,8 +354,6 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
         DrawRectangleRec(chainButton, defaultColor);
     }
     DrawText("Chained", 465, 345, 20, WHITE);
-
-  
     DrawText("Select Internal Organization Mode:", 300, 390, 20, BLACK);
     Rectangle unsortedButton = {300, 420, 140, 30};
     Rectangle sortedButton = {450, 420, 140, 30};
@@ -414,8 +371,6 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
         DrawRectangleRec(sortedButton, defaultColor);
     }
     DrawText("Sorted", 465, 425, 20, WHITE);
-
-  
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         Vector2 mousePos = GetMousePosition();
         if (CheckCollisionPointRec(mousePos, contButton)) {
@@ -431,8 +386,6 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
             internal_org_choice = 2;
         }
     }
-
-   
     Rectangle submitButton = {350, 480, 100, 40};
     DrawRectangleRec(submitButton, GREEN);
     DrawText("Submit", 375, 490, 20, WHITE);
@@ -447,20 +400,17 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
             showSuccess = false;
         }
     }
-
-
     if (showSuccess) {
         TransitionWithText(WHITE, GREEN, 60, buffer);
     } else if (showError) {
         DrawText("Please fill in all the fields", 450, 550, 20, RED);
     }
-
-    
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
     }
 }
+
 
 void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
@@ -472,36 +422,28 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char message[100] = "";
     static float searchAnimation = 0.0f;
     
-    // Title
     DrawCenteredText("Search Record", 50, 40, DARKBLUE);
-    
-    // Input Fields
+
     int inputWidth = 300;
     int inputHeight = 40;
     int startY = 150;
-    
-    // Filename Input
     DrawText("Enter File Name:", 450, startY, 20, BLACK);
     Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
     DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(filenameBox, 2, BLUE);
     DrawText(filename, 460, startY + 40, 20, BLACK);
-    
-    // Record ID Input
+
     DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
     DrawText(record_id_input, 460, startY + 140, 20, BLACK);
-    
-    // Handle Input Selection
+
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) active_input = 1;
         else if (CheckCollisionPointRec(GetMousePosition(), idBox)) active_input = 2;
         else active_input = 0;
     }
-    
-    // Handle Text Input
     if (active_input > 0) {
         int key = GetCharPressed();
         char *currentInput = (active_input == 1) ? filename : record_id_input;
@@ -515,23 +457,18 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
             }
             key = GetCharPressed();
         }
-        
         if (IsKeyPressed(KEY_BACKSPACE) && strlen(currentInput) > 0) {
             currentInput[strlen(currentInput) - 1] = '\0';
         }
     }
-    
-    // Search Button
+
     Rectangle searchBtn = {450, startY + 200, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), searchBtn);
     DrawRectangleRec(searchBtn, btnHovered ? DARKBLUE : BLUE);
     DrawText("Search Record", 520, startY + 215, 20, WHITE);
-    
-    // Handle Search
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         char buffer[BUFFER_SIZE];
         File *file = find_file(sm, filename, buffer);
-        
         if (file == NULL) {
             showError = true;
             showResult = false;
@@ -558,8 +495,6 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         }
         searchAnimation = 0.0f;
     }
-    
-    // Animate Search Result
     if (showResult || showError) {
         searchAnimation += GetFrameTime() * 2;
         if (searchAnimation > 1.0f) searchAnimation = 1.0f;
@@ -568,7 +503,6 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         Rectangle resultBox = {350, startY + 280, 500, 100};
         DrawRectangleRec(resultBox, Fade(LIGHTGRAY, 0.3f));
         DrawRectangleLinesEx(resultBox, 2, BLUE);
-        
         if (showResult) {
             char resultText[100];
             snprintf(resultText, sizeof(resultText), "Record ID: %d", found_record.id);
@@ -578,8 +512,6 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
             DrawText(message, 370, startY + 315, 20, Fade(RED, alpha));
         }
     }
-    
-    // Return to Main Menu
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
@@ -589,26 +521,20 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
 
 void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     DrawCenteredText("Memory State", 50, 40, DARKBLUE);
-    
-    //calculate display parameters
+
     int blockSize = 50;
     int padding = 10;
     int blocksPerRow = 10;
     int startX = (GetScreenWidth() - (blocksPerRow * (blockSize + padding))) / 2;
     int startY = 150;
     
-    //display block information
     for (int i = 0; i < sm->total_blocks; i++) {
         int row = i / blocksPerRow;
         int col = i % blocksPerRow;
         int x = startX + col * (blockSize + padding);
         int y = startY + row * (blockSize + padding);
-        
-        //drawing block rectangle
         Color blockColor = sm->allocation_table[i] == 0 ? GREEN : RED;
         DrawRectangle(x, y, blockSize, blockSize, blockColor);
-        
-        //drawing block number
         char blockNum[5];
         snprintf(blockNum, sizeof(blockNum), "%d", i);
         int textWidth = MeasureText(blockNum, 20);
@@ -619,63 +545,52 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     DrawText("Free", startX + 30, startY - 60, 20, BLACK);
     DrawRectangle(startX + 150, startY - 60, 20, 20, RED);
     DrawText("Occupied", startX + 180, startY - 60, 20, BLACK);
-
     int occupiedBlocks = 0;
     for (int i = 0; i < sm->total_blocks; i++) {
         if (sm->allocation_table[i] == 1) occupiedBlocks++;
     }
-    
     char stats[100];
-    snprintf(stats, sizeof(stats), "Total Blocks: %d | Occupied: %d | Free: %d", 
-             sm->total_blocks, occupiedBlocks, sm->total_blocks - occupiedBlocks);
+    snprintf(stats, sizeof(stats), "Total Blocks: %d | Occupied: %d | Free: %d", sm->total_blocks, occupiedBlocks, sm->total_blocks - occupiedBlocks);
     DrawText(stats, startX, startY - 100, 20, BLACK);
 
-    DrawText("Press SPACE to return to main menu",
-             GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2, 
-             GetScreenHeight() - 50, 20, DARKGRAY);
-    
+    DrawText("Press SPACE to return to main menu", GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2, GetScreenHeight() - 50, 20, DARKGRAY);
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
     }
 }
 
+
 void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm) {
     DrawCenteredText("File Metadata", 50, 40, DARKBLUE);
-    
     const int startY = 120;
     const int rowHeight = 40;
     const int colWidth = 160;
     const int startX = 100;
-    
+
     DrawText("Filename", startX, startY, 20, BLACK);
     DrawText("Size(Blocks)", startX + colWidth, startY, 20, BLACK);
     DrawText("Size(Records)", startX + colWidth * 2, startY, 20, BLACK);
     DrawText("First Block", startX + colWidth * 3, startY, 20, BLACK);
     DrawText("Global Org", startX + colWidth * 4, startY, 20, BLACK);
     DrawText("Internal Org", startX + colWidth * 5, startY, 20, BLACK);
-
     DrawLine(startX, startY + 30, startX + colWidth * 6 - 60, startY + 30, DARKGRAY);
 
     File *current = sm->file_list;
     int row = 0;
-    
     while (current != NULL && row < 12) {  //limit to prevent overflow (balak hna)
         int yPos = startY + 50 + (row * rowHeight);
-        
         DrawText(current->metadata.filename, 
                 startX, yPos, 18, DARKGRAY);
-        
         char blocks[10], records[10], first_block[10];
         snprintf(blocks, sizeof(blocks), "%d", current->metadata.size_in_blocks);
         snprintf(records, sizeof(records), "%d", current->metadata.size_in_records);
         snprintf(first_block, sizeof(first_block), "%d", current->metadata.first_block_address);
-        
-        DrawText(blocks, 
+        DrawText(blocks,
                 startX + colWidth, yPos, 18, DARKGRAY);
-        DrawText(records, 
+        DrawText(records,
                 startX + colWidth * 2, yPos, 18, DARKGRAY);
-        DrawText(first_block, 
+        DrawText(first_block,
                 startX + colWidth * 3, yPos, 18, DARKGRAY);
         DrawText(current->metadata.global_org == CONTIGUOUS ? "Contiguous" : "Chained", 
                 startX + colWidth * 4, yPos, 18, DARKGRAY);
@@ -685,15 +600,11 @@ void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm) {
         current = current->next;
         row++;
     }
-    
     DrawRectangleLinesEx((Rectangle){startX - 10, startY - 10, 
                                    colWidth * 6 - 40, 
                                    rowHeight * (row + 1) + 30}, 2, BLUE);
     
-    DrawText("Press SPACE to return to main menu", 
-             GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2, 
-             GetScreenHeight() - 50, 20, DARKGRAY);
-    
+    DrawText("Press SPACE to return to main menu", GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2,GetScreenHeight() - 50, 20, DARKGRAY);
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
@@ -743,9 +654,8 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
 
     if (active_input > 0) {
         int key = GetCharPressed();
-        char *currentInput = (active_input == 1) ? filename : 
-                           (active_input == 2) ? record_id : record_data;
-        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 
+        char *currentInput = (active_input == 1) ? filename : (active_input == 2) ? record_id : record_data;
+        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 :
                     (active_input == 2) ? 31 : 255;
         
         while (key > 0) {
@@ -761,12 +671,10 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
             currentInput[strlen(currentInput) - 1] = '\0';
         }
     }
-
     Rectangle submitBtn = {450, startY + 300, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), submitBtn);
     DrawRectangleRec(submitBtn, btnHovered ? DARKBLUE : BLUE);
     DrawText("Insert Record", 520, startY + 315, 20, WHITE);
-
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id) > 0 && strlen(record_data) > 0) {
             char buffer[BUFFER_SIZE];
@@ -786,7 +694,6 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
                         showSuccess = true;
                         showError = false;
                         strcpy(message, "Record inserted successfully!");
-
                         filename[0] = '\0';
                         record_id[0] = '\0';
                         record_data[0] = '\0';
@@ -812,7 +719,6 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
             strcpy(message, "Please fill all fields.");
         }
     }
-
     if (showSuccess) {
         DrawText(message, 450, startY + 370, 20, GREEN);
     } else if (showError) {
@@ -876,13 +782,11 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
         }
     }
     
-    // Delete Button
     Rectangle deleteBtn = {450, startY + 200, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), deleteBtn);
     DrawRectangleRec(deleteBtn, btnHovered ? DARKBROWN : RED);
     DrawText("Delete Record", 520, startY + 215, 20, WHITE);
     
-    // Handle Delete Operation
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             char buffer[BUFFER_SIZE];
@@ -920,7 +824,6 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
                             showResult = true;
                             showError = false;
                             sprintf(message, "Record with ID %d deleted successfully!", record_id);
-
                             filename[0] = '\0';
                             record_id_input[0] = '\0';
                         } else {
@@ -978,7 +881,6 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
         }
     }
     
-
     if (active_input == 1) {
         int key = GetCharPressed();
         while (key > 0) {
@@ -1031,6 +933,7 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
+
 void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
     static int active_input = 0;
@@ -1038,19 +941,15 @@ void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
     static bool showError = false;
     static char message[256] = "";
     static float messageTimer = 0;
-    
     DrawCenteredText("Delete File", 50, 40, DARKBLUE);
-    
     int inputWidth = 300;
     int inputHeight = 40;
     int startY = 200;
-    
     DrawText("Enter File Name:", 450, startY, 20, BLACK);
     Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
     DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(filenameBox, 2, BLUE);
     DrawText(filename, 460, startY + 40, 20, BLACK);
-    
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) {
             active_input = 1;
@@ -1103,14 +1002,12 @@ void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
             if (current != NULL) {
                 if (remove(filename) == 0) {
                     if (current->metadata.global_org == CONTIGUOUS) {
-                        for (int i = current->metadata.first_block_address; 
-                             i < current->metadata.first_block_address + current->metadata.size_in_blocks; i++) {
+                        for (int i = current->metadata.first_block_address; i < current->metadata.first_block_address + current->metadata.size_in_blocks; i++) {
                             sm->allocation_table[i] = 0;
                         }
                     } else {
                         int blocks_freed = 0;
-                        for (int i = 0; i < sm->total_blocks && 
-                             blocks_freed < current->metadata.size_in_blocks; i++) {
+                        for (int i = 0; i < sm->total_blocks && blocks_freed < current->metadata.size_in_blocks; i++) {
                             if (sm->allocation_table[i] == 1) {
                                 sm->allocation_table[i] = 0;
                                 blocks_freed++;
@@ -1126,8 +1023,7 @@ void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
                     
                     File *file_list_prev = NULL;
                     File *file_list_current = sm->file_list;
-                    while (file_list_current != NULL && 
-                           strcmp(file_list_current->metadata.filename, filename) != 0) {
+                    while (file_list_current != NULL && strcmp(file_list_current->metadata.filename, filename) != 0) {
                         file_list_prev = file_list_current;
                         file_list_current = file_list_current->next;
                     }
@@ -1139,7 +1035,6 @@ void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
                             file_list_prev->next = file_list_current->next;
                         }
                     }
-                    
                     free(current);
                     showResult = true;
                     showError = false;
@@ -1266,10 +1161,8 @@ void ShowRenameFileScreen(AppState *state, SecondaryMemory *sm) {
 
 
 void ShowCompactMemoryScreen(AppState *state) {
-    DrawCenteredText("Compact Memory (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-     if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
+    DrawCenteredText("Compact Memory (Under Development)", GetScreenHeight() / 2, 20, BLACK);if (IsKeyPressed(KEY_SPACE)){
+         *state = STATE_MAIN_MENU;TransitionEffect(WHITE, 60);
     } }
 
 
