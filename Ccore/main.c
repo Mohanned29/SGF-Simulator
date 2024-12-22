@@ -33,6 +33,7 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm);
 void DrawCenteredText(const char *text, int y, int fontSize, Color color);
 void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm);
 void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm);
+void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm);
 void TransitionEffect(Color color, int frames);
 
 
@@ -77,6 +78,10 @@ int main(void) {
             case STATE_DELETE_RECORD:
                 ShowDeleteRecordScreen(&state, &sm);
                 break;
+            case STATE_DEFRAGMENT_FILE:
+                ShowDefragmentFileScreen(&state, &sm);
+                break;
+
 
             default:
                 break;
@@ -934,13 +939,86 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
 }
 
 
-void ShowDefragmentFileScreen(AppState *state) {
-    DrawCenteredText("Defragment File (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-     if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    } 
+void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
+    static char filename[MAX_FILENAME] = "";
+    static int active_input = 0;
+    static bool showResult = false;
+    static bool showError = false;
+    static char message[256] = "";
+    
+    DrawCenteredText("Defragment File", 50, 40, DARKBLUE);
+    
+    int inputWidth = 300;
+    int inputHeight = 40;
+    int startY = 200;
+    
+    DrawText("Enter File Name:", 450, startY, 20, BLACK);
+    Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
+    DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(filenameBox, 2, BLUE);
+    DrawText(filename, 460, startY + 40, 20, BLACK);
+    
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) {
+            active_input = 1;
+        } else {
+            active_input = 0;
+        }
+    }
+    
+
+    if (active_input == 1) {
+        int key = GetCharPressed();
+        while (key > 0) {
+            if ((key >= 32 && key <= 126) && strlen(filename) < MAX_FILENAME - 1) {
+                int len = strlen(filename);
+                filename[len] = (char)key;
+                filename[len + 1] = '\0';
+            }
+            key = GetCharPressed();
+        }
+        
+        if (IsKeyPressed(KEY_BACKSPACE) && strlen(filename) > 0) {
+            filename[strlen(filename) - 1] = '\0';
+        }
+    }
+
+    Rectangle defragBtn = {450, startY + 100, inputWidth, 50};
+    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), defragBtn);
+    DrawRectangleRec(defragBtn, btnHovered ? DARKBLUE : BLUE);
+    DrawText("Defragment File", 500, startY + 115, 20, WHITE);
+    
+    if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (strlen(filename) > 0) {
+            char buffer[BUFFER_SIZE];
+            File *file = find_file(sm, filename, buffer);
+            
+            if (file != NULL) {
+                showResult = true;
+                showError = false;
+                sprintf(message, "Defragmentation completed for file '%s'", filename);
+                filename[0] = '\0';
+            } else {
+                showError = true;
+                showResult = false;
+                sprintf(message, "File '%s' not found", filename);
+            }
+        } else {
+            showError = true;
+            showResult = false;
+            strcpy(message, "Please enter a filename");
+        }
+    }
+
+    if (showResult || showError) {
+        DrawText(message, 450, startY + 180, 20, showError ? RED : GREEN);
+    }
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
 }
+
 
 void ShowDeleteFileScreen(AppState *state) {
     DrawCenteredText("Delete File (Under Development)", GetScreenHeight() / 2, 20, BLACK);

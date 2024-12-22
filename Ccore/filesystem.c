@@ -396,6 +396,8 @@ void defragment_file(SecondaryMemory *sm) {
 
     printf("Defragmentation completed for file '%s'.\n", filename);
 }
+
+
 void delete_file(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];
     printf("Enter the file name to delete: ");
