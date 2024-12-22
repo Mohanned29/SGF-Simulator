@@ -33,7 +33,10 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm);
 void DrawCenteredText(const char *text, int y, int fontSize, Color color);
 void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm);
 void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm);
+void ShowRenameFileScreen(AppState *state, SecondaryMemory *sm);
+void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm);
 void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm);
+void ShowClearSecondaryMemoryScreen(AppState *state, SecondaryMemory *sm);
 void TransitionEffect(Color color, int frames);
 
 
@@ -63,11 +66,20 @@ int main(void) {
             case STATE_MAIN_MENU:
                 ShowMainMenu(&state);
                 break;
+            case STATE_CLEAR_SECONDARY_MEMORY:
+                ShowClearSecondaryMemoryScreen(&state, &sm);
+                break;
             case STATE_CREATE_FILE:
                 ShowCreateFileScreen(&sm,&state);
                 break;
             case STATE_SEARCH_RECORD:
                 ShowSearchRecordScreen(&state, &sm);
+                break;
+            case STATE_DELETE_FILE:
+                ShowDeleteFileScreen(&state, &sm);
+                break;
+            case STATE_RENAME_FILE:
+                ShowRenameFileScreen(&state, &sm);
                 break;
             case STATE_DISPLAY_MEMORY:
                 ShowDisplayMemoryScreen(&state, &sm);
@@ -1019,21 +1031,239 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
+void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
+    static char filename[MAX_FILENAME] = "";
+    static int active_input = 0;
+    static bool showResult = false;
+    static bool showError = false;
+    static char message[256] = "";
+    static float messageTimer = 0;
+    
+    DrawCenteredText("Delete File", 50, 40, DARKBLUE);
+    
+    int inputWidth = 300;
+    int inputHeight = 40;
+    int startY = 200;
+    
+    DrawText("Enter File Name:", 450, startY, 20, BLACK);
+    Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
+    DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(filenameBox, 2, BLUE);
+    DrawText(filename, 460, startY + 40, 20, BLACK);
+    
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) {
+            active_input = 1;
+        } else {
+            active_input = 0;
+        }
+    }
+    
+    if (active_input == 1) {
+        int key = GetCharPressed();
+        while (key > 0) {
+            if ((key >= 32 && key <= 126) && strlen(filename) < MAX_FILENAME - 1) {
+                int len = strlen(filename);
+                filename[len] = (char)key;
+                filename[len + 1] = '\0';
+            }
+            key = GetCharPressed();
+        }
+        
+        if (IsKeyPressed(KEY_BACKSPACE) && strlen(filename) > 0) {
+            filename[strlen(filename) - 1] = '\0';
+        }
+    }
 
-void ShowDeleteFileScreen(AppState *state) {
-    DrawCenteredText("Delete File (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-    if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    } 
+    Rectangle deleteBtn = {450, startY + 100, inputWidth, 50};
+    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), deleteBtn);
+    DrawRectangleRec(deleteBtn, btnHovered ? DARKBROWN : RED);
+    DrawText("Delete File", 520, startY + 115, 20, WHITE);
+    
+    if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (strlen(filename) > 0) {
+            unsigned int index = hash_function(filename);
+            File *prev = NULL;
+            File *current = sm->hash_table[index];
+            
+            while (current != NULL && strcmp(current->metadata.filename, filename) != 0) {
+                prev = current;
+                current = current->next;
+            }
+            
+            if (current == NULL) {
+                current = sm->file_list;
+                prev = NULL;
+                while (current != NULL && strcmp(current->metadata.filename, filename) != 0) {
+                    prev = current;
+                    current = current->next;
+                }
+            }
+            
+            if (current != NULL) {
+                if (remove(filename) == 0) {
+                    if (current->metadata.global_org == CONTIGUOUS) {
+                        for (int i = current->metadata.first_block_address; 
+                             i < current->metadata.first_block_address + current->metadata.size_in_blocks; i++) {
+                            sm->allocation_table[i] = 0;
+                        }
+                    } else {
+                        int blocks_freed = 0;
+                        for (int i = 0; i < sm->total_blocks && 
+                             blocks_freed < current->metadata.size_in_blocks; i++) {
+                            if (sm->allocation_table[i] == 1) {
+                                sm->allocation_table[i] = 0;
+                                blocks_freed++;
+                            }
+                        }
+                    }
+                    
+                    if (prev == NULL) {
+                        sm->hash_table[index] = current->next;
+                    } else {
+                        prev->next = current->next;
+                    }
+                    
+                    File *file_list_prev = NULL;
+                    File *file_list_current = sm->file_list;
+                    while (file_list_current != NULL && 
+                           strcmp(file_list_current->metadata.filename, filename) != 0) {
+                        file_list_prev = file_list_current;
+                        file_list_current = file_list_current->next;
+                    }
+                    
+                    if (file_list_current != NULL) {
+                        if (file_list_prev == NULL) {
+                            sm->file_list = file_list_current->next;
+                        } else {
+                            file_list_prev->next = file_list_current->next;
+                        }
+                    }
+                    
+                    free(current);
+                    showResult = true;
+                    showError = false;
+                    sprintf(message, "File '%s' deleted successfully", filename);
+                    filename[0] = '\0';
+                } else {
+                    showError = true;
+                    sprintf(message, "Error deleting file '%s'", filename);
+                }
+            } else {
+                showError = true;
+                sprintf(message, "File '%s' not found", filename);
+            }
+            messageTimer = 3.0f;
+        }
+    }
+
+    if (messageTimer > 0) {
+        DrawText(message, 450, startY + 180, 20, showError ? RED : GREEN);
+        messageTimer -= GetFrameTime();
+    }
+
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
 }
 
-void ShowRenameFileScreen(AppState *state) {
-    DrawCenteredText("Rename File (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-     if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    } }
+
+void ShowRenameFileScreen(AppState *state, SecondaryMemory *sm) {
+    static char old_filename[MAX_FILENAME] = "";
+    static char new_filename[MAX_FILENAME] = "";
+    static int active_input = 0;
+    static bool showResult = false;
+    static bool showError = false;
+    static char message[256] = "";
+    
+    DrawCenteredText("Rename File", 50, 40, DARKBLUE);
+    
+    int inputWidth = 300;
+    int inputHeight = 40;
+    int startY = 150;
+    
+    DrawText("Current File Name:", 450, startY, 20, BLACK);
+    Rectangle oldFilenameBox = {450, startY + 30, inputWidth, inputHeight};
+    DrawRectangleRec(oldFilenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(oldFilenameBox, 2, BLUE);
+    DrawText(old_filename, 460, startY + 40, 20, BLACK);
+    
+    DrawText("New File Name:", 450, startY + 100, 20, BLACK);
+    Rectangle newFilenameBox = {450, startY + 130, inputWidth, inputHeight};
+    DrawRectangleRec(newFilenameBox, (active_input == 2) ? LIGHTGRAY : WHITE);
+    DrawRectangleLinesEx(newFilenameBox, 2, BLUE);
+    DrawText(new_filename, 460, startY + 140, 20, BLACK);
+    
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(GetMousePosition(), oldFilenameBox)) active_input = 1;
+        else if (CheckCollisionPointRec(GetMousePosition(), newFilenameBox)) active_input = 2;
+        else active_input = 0;
+    }
+    
+    if (active_input > 0) {
+        int key = GetCharPressed();
+        char *currentInput = (active_input == 1) ? old_filename : new_filename;
+        
+        while (key > 0) {
+            if ((key >= 32 && key <= 126) && strlen(currentInput) < MAX_FILENAME - 1) {
+                int len = strlen(currentInput);
+                currentInput[len] = (char)key;
+                currentInput[len + 1] = '\0';
+            }
+            key = GetCharPressed();
+        }
+        
+        if (IsKeyPressed(KEY_BACKSPACE) && strlen(currentInput) > 0) {
+            currentInput[strlen(currentInput) - 1] = '\0';
+        }
+    }
+    
+    Rectangle renameBtn = {450, startY + 200, inputWidth, 50};
+    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), renameBtn);
+    DrawRectangleRec(renameBtn, btnHovered ? DARKBLUE : BLUE);
+    DrawText("Rename File", 520, startY + 215, 20, WHITE);
+
+    if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (strlen(old_filename) > 0 && strlen(new_filename) > 0) {
+            char buffer[BUFFER_SIZE];
+            File *file = find_file(sm, old_filename, buffer);
+            
+            if (file == NULL) {
+                showError = true;
+                sprintf(message, "File '%s' not found", old_filename);
+            } else if (find_file(sm, new_filename, buffer) != NULL) {
+                showError = true;
+                sprintf(message, "File '%s' already exists", new_filename);
+            } else {
+                if (rename(old_filename, new_filename) == 0) {
+                    strcpy(file->metadata.filename, new_filename);
+                    showResult = true;
+                    showError = false;
+                    sprintf(message, "File renamed to '%s'", new_filename);
+                    old_filename[0] = '\0';
+                    new_filename[0] = '\0';
+                } else {
+                    showError = true;
+                    sprintf(message, "Error renaming file '%s'", old_filename);
+                }
+            }
+        } else {
+            showError = true;
+            strcpy(message, "Please fill both fields");
+        }
+    }
+
+    if (showResult || showError) {
+        DrawText(message, 450, startY + 280, 20, showError ? RED : GREEN);
+    }
+
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
+}
+
 
 void ShowCompactMemoryScreen(AppState *state) {
     DrawCenteredText("Compact Memory (Under Development)", GetScreenHeight() / 2, 20, BLACK);
@@ -1042,10 +1272,62 @@ void ShowCompactMemoryScreen(AppState *state) {
          TransitionEffect(WHITE, 60);
     } }
 
-void ShowClearSecondaryMemoryScreen(AppState *state) {
-    DrawCenteredText("Clear Secondary Memory (Under Development)", GetScreenHeight() / 2, 20, BLACK);
-    if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;
-         TransitionEffect(WHITE, 60);
-    } 
+
+void ShowClearSecondaryMemoryScreen(AppState *state, SecondaryMemory *sm) {
+    static bool showConfirmation = false;
+    static bool showResult = false;
+    static float messageTimer = 0;
+
+    DrawCenteredText("Clear Secondary Memory", 50, 40, DARKBLUE);
+    
+    if (!showConfirmation && !showResult) {
+        DrawCenteredText("Warning: This action will delete all files and clear memory.", 200, 25, RED);
+        DrawCenteredText("This action cannot be undone.", 250, 25, RED);
+        
+        Rectangle clearBtn = {450, 300, 300, 50};
+        bool btnHovered = CheckCollisionPointRec(GetMousePosition(), clearBtn);
+        DrawRectangleRec(clearBtn, btnHovered ? DARKBROWN : RED);
+        DrawText("Clear Memory", 520, 315, 20, WHITE);
+        
+        if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            showConfirmation = true;
+        }
+    } else if (showConfirmation) {
+        DrawRectangle(350, 250, 500, 200, Fade(LIGHTGRAY, 0.9f));
+        DrawRectangleLinesEx((Rectangle){350, 250, 500, 200}, 2, DARKGRAY);
+        DrawText("Are you sure you want to clear memory?", 400, 280, 20, BLACK);
+        
+        Rectangle yesBtn = {400, 350, 150, 40};
+        bool yesHovered = CheckCollisionPointRec(GetMousePosition(), yesBtn);
+        DrawRectangleRec(yesBtn, yesHovered ? DARKBROWN : RED);
+        DrawText("Yes", 460, 360, 20, WHITE);
+        
+        Rectangle noBtn = {600, 350, 150, 40};
+        bool noHovered = CheckCollisionPointRec(GetMousePosition(), noBtn);
+        DrawRectangleRec(noBtn, noHovered ? DARKBLUE : BLUE);
+        DrawText("No", 665, 360, 20, WHITE);
+        
+        if (yesHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            clear_memory(sm);
+            showConfirmation = false;
+            showResult = true;
+            messageTimer = 2.0f;
+        } else if (noHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            showConfirmation = false;
+        }
+    }
+    
+    if (showResult) {
+        messageTimer -= GetFrameTime();
+        if (messageTimer > 0) {
+            DrawCenteredText("Memory cleared successfully!", 400, 25, GREEN);
+        } else {
+            showResult = false;
+        }
+    }
+    
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
 }
