@@ -37,6 +37,7 @@ void ShowRenameFileScreen(AppState *state, SecondaryMemory *sm);
 void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm);
 void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm);
 void ShowClearSecondaryMemoryScreen(AppState *state, SecondaryMemory *sm);
+void ShowCompactMemoryScreen(AppState *state, SecondaryMemory *sm);
 void TransitionEffect(Color color, int frames);
 
 
@@ -71,6 +72,9 @@ int main(void) {
                 break;
             case STATE_CREATE_FILE:
                 ShowCreateFileScreen(&sm,&state);
+                break;
+            case STATE_COMPACT_MEMORY:
+                ShowCompactMemoryScreen(&state, &sm);
                 break;
             case STATE_SEARCH_RECORD:
                 ShowSearchRecordScreen(&state, &sm);
@@ -1125,10 +1129,78 @@ void ShowRenameFileScreen(AppState *state, SecondaryMemory *sm) {
 }
 
 
-void ShowCompactMemoryScreen(AppState *state) {
-    DrawCenteredText("Compact Memory (Under Development)", GetScreenHeight() / 2, 20, BLACK);if (IsKeyPressed(KEY_SPACE)){
-         *state = STATE_MAIN_MENU;TransitionEffect(WHITE, 60);
-    } }
+void ShowCompactMemoryScreen(AppState *state, SecondaryMemory *sm) {
+    static bool showConfirmation = false;
+    static bool showResult = false;
+    static float messageTimer = 0;
+    static bool animationStarted = false;
+    static float animationProgress = 0;
+
+    DrawCenteredText("Compact Memory", 50, 40, DARKBLUE);
+    
+    if (!showConfirmation && !showResult) {
+        DrawCenteredText("This operation will reorganize memory blocks to eliminate fragmentation.", 150, 20, BLACK);
+        
+        Rectangle compactBtn = {450, 300, 300, 50};
+        bool btnHovered = CheckCollisionPointRec(GetMousePosition(), compactBtn);
+        DrawRectangleRec(compactBtn, btnHovered ? DARKBLUE : BLUE);
+        DrawText("Compact Memory", 510, 315, 20, WHITE);
+        
+        if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            showConfirmation = true;
+        }
+    } else if (showConfirmation) {
+        DrawRectangle(350, 250, 500, 200, Fade(LIGHTGRAY, 0.9f));
+        DrawRectangleLinesEx((Rectangle){350, 250, 500, 200}, 2, DARKGRAY);
+        DrawText("Proceed with memory compaction?", 400, 280, 20, BLACK);
+
+        Rectangle yesBtn = {400, 350, 150, 40};
+        bool yesHovered = CheckCollisionPointRec(GetMousePosition(), yesBtn);
+        DrawRectangleRec(yesBtn, yesHovered ? DARKBLUE : BLUE);
+        DrawText("Yes", 460, 360, 20, WHITE);
+
+        Rectangle noBtn = {600, 350, 150, 40};
+        bool noHovered = CheckCollisionPointRec(GetMousePosition(), noBtn);
+        DrawRectangleRec(noBtn, noHovered ? DARKGRAY : LIGHTGRAY);
+        DrawText("No", 665, 360, 20, BLACK);
+        
+        if (yesHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            compact_memory(sm);
+            showConfirmation = false;
+            showResult = true;
+            messageTimer = 2.0f;
+            animationStarted = true;
+        } else if (noHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            showConfirmation = false;
+        }
+    }
+    if (animationStarted) {
+        animationProgress += GetFrameTime();
+        if (animationProgress <= 1.0f) {
+            DrawRectangle(400, 400, 400, 30, LIGHTGRAY);
+            DrawRectangle(400, 400, (int)(400 * animationProgress), 30, BLUE);
+            DrawText(TextFormat("%d%%", (int)(animationProgress * 100)), 
+                    580, 405, 20, BLACK);
+        } else {
+            animationStarted = false;
+            animationProgress = 0;
+        }
+    }
+    
+    if (showResult) {
+        messageTimer -= GetFrameTime();
+        if (messageTimer > 0) {
+            DrawCenteredText("Memory compaction completed successfully!", 400, 25, GREEN);
+        } else {
+            showResult = false;
+        }
+    }
+
+    if (IsKeyPressed(KEY_SPACE)) {
+        *state = STATE_MAIN_MENU;
+        TransitionEffect(WHITE, 60);
+    }
+}
 
 
 void ShowClearSecondaryMemoryScreen(AppState *state, SecondaryMemory *sm) {

@@ -277,6 +277,7 @@ int find_free_block(SecondaryMemory *sm) {
     return -1;
 }
 
+
 void update_memory_allocation(SecondaryMemory *sm, File *file) {
     int records_per_block = sm->block_size / sizeof(Record);
     int required_blocks = (file->metadata.size_in_records + records_per_block - 1) / records_per_block;
@@ -291,6 +292,7 @@ void update_memory_allocation(SecondaryMemory *sm, File *file) {
         file->metadata.size_in_blocks++;
     }
 }
+
 
 
 void insert_record(SecondaryMemory *sm) {
@@ -488,8 +490,47 @@ void rename_file(SecondaryMemory *sm) {
 }
 
 void compact_memory(SecondaryMemory *sm) {
-    printf("Memory compaction completed.\n");
+    // First update all files' block requirements
+    File *current = sm->file_list;
+    while (current != NULL) {
+        update_memory_allocation(sm, current);
+        current = current->next;
+    }
+    
+    int *new_allocation_table = (int *)calloc(sm->total_blocks, sizeof(int));
+    int current_block = 0;
+    
+    // Handle contiguous files first
+    current = sm->file_list;
+    while (current != NULL) {
+        if (current->metadata.global_org == CONTIGUOUS) {
+            int blocks_needed = current->metadata.size_in_blocks;
+            current->metadata.first_block_address = current_block;
+            for (int i = 0; i < blocks_needed; i++) {
+                new_allocation_table[current_block + i] = 1;
+            }
+            current_block += blocks_needed;
+        }
+        current = current->next;
+    }
+
+    current = sm->file_list;
+    while (current != NULL) {
+        if (current->metadata.global_org == CHAINED) {
+            int blocks_needed = current->metadata.size_in_blocks;
+            current->metadata.first_block_address = current_block;
+            for (int i = 0; i < blocks_needed; i++) {
+                new_allocation_table[current_block + i] = 1;
+                current_block++;
+            }
+        }
+        current = current->next;
+    }
+    
+    free(sm->allocation_table);
+    sm->allocation_table = new_allocation_table;
 }
+
 
 void clear_memory(SecondaryMemory *sm) {
     File *current = sm->file_list;
