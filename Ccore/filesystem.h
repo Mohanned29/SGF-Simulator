@@ -46,6 +46,9 @@ typedef struct SecondaryMemory {
     int total_blocks;
     int block_size;
     int *allocation_table;
+    char filename[MAX_FILENAME];
+    int record_id;
+
     File *file_list;
     File *hash_table[HASH_TABLE_SIZE];  // adding hash table for flex
 } SecondaryMemory;
@@ -58,7 +61,7 @@ void display_memory_state(SecondaryMemory *sm);
 void display_file_metadata(SecondaryMemory *sm);
 void search_record(SecondaryMemory *sm);
 void insert_record(SecondaryMemory *sm);
-void delete_record(SecondaryMemory *sm);
+char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, char* buffer);
 void defragment_file(SecondaryMemory *sm);
 void delete_file(SecondaryMemory *sm);
 void rename_file(SecondaryMemory *sm);

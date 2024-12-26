@@ -331,26 +331,15 @@ void insert_record(SecondaryMemory *sm) {
 }
 
 
-
-void delete_record(SecondaryMemory *sm) {
-    char filename[MAX_FILENAME];
-    int record_id;
-    printf("Enter the file name: ");
-    scanf("%s", filename);
-
+char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, char* buffer) {
     File *file = find_file(sm, filename, buffer);
     if (file == NULL) {
-        printf("File '%s' not found.\n", filename);
-        return;
+        return "File not found";
     }
-
-    printf("Enter Record ID to delete: ");
-    scanf("%d", &record_id);
 
     FILE *fp = fopen(filename, "rb");
     if (fp == NULL) {
-        printf("Error opening file '%s'.\n", filename);
-        return;
+        return "Error opening file";
     }
 
     Record *records = malloc(sizeof(Record) * file->metadata.size_in_records);
@@ -369,20 +358,19 @@ void delete_record(SecondaryMemory *sm) {
     if (found) {
         fp = fopen(filename, "wb");
         if (fp == NULL) {
-            printf("Error writing to file '%s'.\n", filename);
             free(records);
-            return;
+            return "Error writing to file";
         }
         fwrite(records, sizeof(Record), count, fp);
         fclose(fp);
         file->metadata.size_in_records--;
-        printf("Record with ID %d deleted from file '%s'.\n", record_id, filename);
+        free(records);
+        return "Record deleted successfully";
     } else {
-        printf("Record with ID %d not found in file '%s'.\n", record_id, filename);
+        free(records);
+        return "Record not found";
     }
-    free(records);
 }
-
 
 void defragment_file(SecondaryMemory *sm) {
     char filename[MAX_FILENAME];

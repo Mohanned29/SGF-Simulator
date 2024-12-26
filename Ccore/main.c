@@ -732,7 +732,6 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
-
 void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
     static char record_id_input[32] = "";
@@ -740,13 +739,14 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     static bool showResult = false;
     static bool showError = false;
     static char message[256] = "";
-
+    static char buffer[BUFFER_SIZE];
+    
     DrawCenteredText("Delete Record", 50, 40, DARKBLUE);
     
     int inputWidth = 300;
     int inputHeight = 40;
     int startY = 150;
-
+    
     DrawText("Enter File Name:", 450, startY, 20, BLACK);
     Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
     DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
@@ -758,6 +758,7 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
     DrawText(record_id_input, 460, startY + 140, 20, BLACK);
+
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) active_input = 1;
         else if (CheckCollisionPointRec(GetMousePosition(), idBox)) active_input = 2;
@@ -781,62 +782,26 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
             currentInput[strlen(currentInput) - 1] = '\0';
         }
     }
-    
+
     Rectangle deleteBtn = {450, startY + 200, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), deleteBtn);
     DrawRectangleRec(deleteBtn, btnHovered ? DARKBROWN : RED);
     DrawText("Delete Record", 520, startY + 215, 20, WHITE);
-    
+
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
-            char buffer[BUFFER_SIZE];
-            File *file = find_file(sm, filename, buffer);
+            const char* result = delete_record(sm, filename, atoi(record_id_input), buffer);
             
-            if (file == NULL) {
-                showError = true;
-                strcpy(message, "File not found!");
+            if (strstr(result, "successfully")) {
+                showResult = true;
+                showError = false;
+                filename[0] = '\0';
+                record_id_input[0] = '\0';
             } else {
-                FILE *fp = fopen(filename, "rb");
-                if (fp == NULL) {
-                    showError = true;
-                    strcpy(message, "Error opening file!");
-                } else {
-                    Record *records = malloc(sizeof(Record) * file->metadata.size_in_records);
-                    int count = 0;
-                    int found = 0;
-                    int record_id = atoi(record_id_input);
-                    
-                    while (fread(&records[count], sizeof(Record), 1, fp)) {
-                        if (records[count].id == record_id) {
-                            found = 1;
-                        } else {
-                            count++;
-                        }
-                    }
-                    fclose(fp);
-                    
-                    if (found) {
-                        fp = fopen(filename, "wb");
-                        if (fp != NULL) {
-                            fwrite(records, sizeof(Record), count, fp);
-                            fclose(fp);
-                            file->metadata.size_in_records--;
-                            showResult = true;
-                            showError = false;
-                            sprintf(message, "Record with ID %d deleted successfully!", record_id);
-                            filename[0] = '\0';
-                            record_id_input[0] = '\0';
-                        } else {
-                            showError = true;
-                            strcpy(message, "Error writing to file!");
-                        }
-                    } else {
-                        showError = true;
-                        sprintf(message, "Record with ID %d not found!", record_id);
-                    }
-                    free(records);
-                }
+                showResult = false;
+                showError = true;
             }
+            strcpy(message, result);
         } else {
             showError = true;
             strcpy(message, "Please fill all fields!");
