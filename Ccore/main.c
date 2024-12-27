@@ -415,7 +415,6 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
     }
 }
 
-
 void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
     static char record_id_input[10] = "";
@@ -431,23 +430,27 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     int inputWidth = 300;
     int inputHeight = 40;
     int startY = 150;
+    
     DrawText("Enter File Name:", 450, startY, 20, BLACK);
     Rectangle filenameBox = {450, startY + 30, inputWidth, inputHeight};
     DrawRectangleRec(filenameBox, (active_input == 1) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(filenameBox, 2, BLUE);
     DrawText(filename, 460, startY + 40, 20, BLACK);
 
+    // Record ID Input
     DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
     DrawText(record_id_input, 460, startY + 140, 20, BLACK);
 
+    // Handle Input Selection
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) active_input = 1;
         else if (CheckCollisionPointRec(GetMousePosition(), idBox)) active_input = 2;
         else active_input = 0;
     }
+
     if (active_input > 0) {
         int key = GetCharPressed();
         char *currentInput = (active_input == 1) ? filename : record_id_input;
@@ -461,44 +464,43 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
             }
             key = GetCharPressed();
         }
+        
         if (IsKeyPressed(KEY_BACKSPACE) && strlen(currentInput) > 0) {
             currentInput[strlen(currentInput) - 1] = '\0';
         }
     }
 
+    // Search Button
     Rectangle searchBtn = {450, startY + 200, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), searchBtn);
     DrawRectangleRec(searchBtn, btnHovered ? DARKBLUE : BLUE);
     DrawText("Search Record", 520, startY + 215, 20, WHITE);
+
+
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        char buffer[BUFFER_SIZE];
-        File *file = find_file(sm, filename, buffer);
-        if (file == NULL) {
-            showError = true;
-            showResult = false;
-            strcpy(message, "File not found!");
-        } else {
-            FILE *fp = fopen(filename, "rb");
-            if (fp == NULL) {
+        if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
+            bool success;
+            char error_msg[100];
+            Record* result = search_record(sm, filename, atoi(record_id_input), &success, error_msg);
+            
+            if (success && result != NULL) {
+                showResult = true;
+                showError = false;
+                found_record = *result;
+                free(result);
+            } else {
                 showError = true;
                 showResult = false;
-                strcpy(message, "Error opening file!");
-            } else {
-                int record_id = atoi(record_id_input);
-                fseek(fp, (record_id - 1) * sizeof(Record), SEEK_SET);
-                if (fread(&found_record, sizeof(Record), 1, fp) == 1) {
-                    showResult = true;
-                    showError = false;
-                } else {
-                    showError = true;
-                    showResult = false;
-                    strcpy(message, "Record not found!");
-                }
-                fclose(fp);
+                strcpy(message, error_msg);
             }
+            searchAnimation = 0.0f;
+        } else {
+            showError = true;
+            showResult = false;
+            strcpy(message, "Please fill all fields!");
         }
-        searchAnimation = 0.0f;
     }
+
     if (showResult || showError) {
         searchAnimation += GetFrameTime() * 2;
         if (searchAnimation > 1.0f) searchAnimation = 1.0f;
@@ -507,6 +509,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         Rectangle resultBox = {350, startY + 280, 500, 100};
         DrawRectangleRec(resultBox, Fade(LIGHTGRAY, 0.3f));
         DrawRectangleLinesEx(resultBox, 2, BLUE);
+        
         if (showResult) {
             char resultText[100];
             snprintf(resultText, sizeof(resultText), "Record ID: %d", found_record.id);
@@ -516,6 +519,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
             DrawText(message, 370, startY + 315, 20, Fade(RED, alpha));
         }
     }
+
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);

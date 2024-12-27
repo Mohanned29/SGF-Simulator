@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define MAX_FILENAME 100
 #define MAX_FILES 50
@@ -59,7 +60,7 @@ void create_file(SecondaryMemory *sm, const char *filename, int num_records, int
 File* find_file(SecondaryMemory *sm, const char *filename, char *buffer);
 void display_memory_state(SecondaryMemory *sm);
 void display_file_metadata(SecondaryMemory *sm);
-void search_record(SecondaryMemory *sm);
+Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, bool* success, char* error_msg);
 void insert_record(SecondaryMemory *sm);
 char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, char* buffer);
 void defragment_file(SecondaryMemory *sm);

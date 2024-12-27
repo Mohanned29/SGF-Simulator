@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define BUFFER_SIZE 512
 char buffer[BUFFER_SIZE];
@@ -31,35 +32,39 @@ Steps :
 
 
 
+
+// ahhhhhh wch hedaaaaa 🤯 wa3er wa3er
 unsigned int hash_function(const char *filename) {
-    unsigned int hash = 0;
-    while (*filename) {
-        hash = (hash * 31) + *filename++;
+    unsigned int hash = 5381;  // Prime seed
+    unsigned int c;
+    int i = 0;
+    
+    while ((c = (unsigned char)filename[i++])) {
+        hash = ((hash << 5) + hash) + c;  // hash * 33 + c
+        hash = hash ^ (hash >> 16);
     }
+    hash = hash * 16777619;
+    hash = hash ^ (hash * 2246822519u);
+    hash = hash ^ (hash >> 13);
+    
     return hash % HASH_TABLE_SIZE;
 }
 
+
+// O(1) collisions through chaining , mts9sinich , fo9 isti3abek 🥱
 File* find_file(SecondaryMemory *sm, const char *filename, char *buffer) {
     unsigned int index = hash_function(filename);
     File *file = sm->hash_table[index];
-
+    
     while (file != NULL) {
         if (strcmp(file->metadata.filename, filename) == 0) {
             return file;
         }
         file = file->next;
     }
-
-    file = sm->file_list;
-    while (file != NULL) {
-        if (strcmp(file->metadata.filename, filename) == 0) {
-            return file;
-        }
-        file = file->next;
-    }
-
     return NULL;
 }
+
 
 void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size, char *buffer) {
     if (block_size < sizeof(Record)) {
@@ -83,6 +88,8 @@ void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int bloc
     snprintf(buffer, BUFFER_SIZE, "Secondary memory initialized with %d blocks of size %d.\n", total_blocks, block_size);
     printf("%s", buffer);
 }
+
+
 
 void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice, char *buffer) {
     GlobalOrganization global_org = (global_org_choice == 1) ? CONTIGUOUS : CHAINED;
@@ -211,7 +218,7 @@ void display_memory_state(SecondaryMemory *sm) {
         // records_per_block = block_size / record_size
         // records_per_block = 512 / 260 ≈ 1.96
 
-        if ((i + 1) % 10 == 0) { // Format output for better readability
+        if ((i + 1) % 10 == 0) {
             printf("\n");
         }
     }
@@ -234,39 +241,55 @@ void display_file_metadata(SecondaryMemory *sm) {
     }
 }
 
-void search_record(SecondaryMemory *sm) {
-    char filename[MAX_FILENAME];
-    int record_id;
-    Record record;
 
-    printf("Enter file name: ");
-    scanf("%s", filename);
-
-    char buffer[BUFFER_SIZE];
-    File *file = find_file(sm, filename, buffer);
-
-    if (file == NULL) {
-        printf("File '%s' not found.\n", filename);
-        return;
+Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, bool* success, char* error_msg) {
+    unsigned int index = hash_function(filename);
+    File *file = sm->hash_table[index];
+    
+    // Search in hash table chain
+    while (file != NULL && strcmp(file->metadata.filename, filename) != 0) {
+        file = file->next;
     }
-
-    printf("Enter record ID to search: ");
-    scanf("%d", &record_id);
-
+    
+    if (file == NULL) {
+        *success = false;
+        strcpy(error_msg, "File not found");
+        return NULL;
+    }
+    
     FILE *fp = fopen(filename, "rb");
     if (fp == NULL) {
-        printf("Error opening file '%s'.\n", filename);
-        return;
+        *success = false;
+        strcpy(error_msg, "Error opening file");
+        return NULL;
     }
-
+    /*
+    exemple
+        if:
+        sizeof(Record) = 260 bytes
+        record_id = 3
+        Then:
+        Offset = (3-1) * 260 = 520 bytes
+        fseek moves directly to byte 520
+        The next fread will get the third record
+    */
+    Record* record = (Record*)malloc(sizeof(Record));
     fseek(fp, (record_id - 1) * sizeof(Record), SEEK_SET);
-    if (fread(&record, sizeof(Record), 1, fp) == 1) {
-        printf("Record found: ID = %d, Data = %s\n", record.id, record.data);
+    
+    if (fread(record, sizeof(Record), 1, fp) == 1) {
+        *success = true;
+        fclose(fp);
+        return record;
     } else {
-        printf("Record not found.\n");
+        *success = false;
+        strcpy(error_msg, "Record not found");
+        free(record);
+        fclose(fp);
+        return NULL;
     }
-    fclose(fp);
 }
+
+
 
 int find_free_block(SecondaryMemory *sm) {
     for (int i = 0; i < sm->total_blocks; i++) {
