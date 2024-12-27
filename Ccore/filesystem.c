@@ -277,21 +277,21 @@ int find_free_block(SecondaryMemory *sm) {
     return -1;
 }
 
-
 void update_memory_allocation(SecondaryMemory *sm, File *file) {
     int records_per_block = sm->block_size / sizeof(Record);
     int required_blocks = (file->metadata.size_in_records + records_per_block - 1) / records_per_block;
-
+    
+    if (file->metadata.size_in_blocks > required_blocks) {
+        file->metadata.size_in_blocks = required_blocks;
+    }
     while (file->metadata.size_in_blocks < required_blocks) {
         int block_to_allocate = find_free_block(sm);
-        if (block_to_allocate == -1) {
-            printf("No more free blocks available.\n");
-            return;
-        }
+        if (block_to_allocate == -1) break;
         sm->allocation_table[block_to_allocate] = 1;
         file->metadata.size_in_blocks++;
     }
 }
+
 
 
 
@@ -490,47 +490,28 @@ void rename_file(SecondaryMemory *sm) {
 }
 
 void compact_memory(SecondaryMemory *sm) {
-    // First update all files' block requirements
-    File *current = sm->file_list;
-    while (current != NULL) {
-        update_memory_allocation(sm, current);
-        current = current->next;
-    }
     
+    File *current = sm->file_list;
     int *new_allocation_table = (int *)calloc(sm->total_blocks, sizeof(int));
     int current_block = 0;
     
-    // Handle contiguous files first
-    current = sm->file_list;
     while (current != NULL) {
-        if (current->metadata.global_org == CONTIGUOUS) {
-            int blocks_needed = current->metadata.size_in_blocks;
-            current->metadata.first_block_address = current_block;
-            for (int i = 0; i < blocks_needed; i++) {
-                new_allocation_table[current_block + i] = 1;
-            }
-            current_block += blocks_needed;
+        int records_per_block = sm->block_size / sizeof(Record);
+        int required_blocks = (current->metadata.size_in_records + records_per_block - 1) / records_per_block;
+        
+        current->metadata.size_in_blocks = required_blocks;
+        current->metadata.first_block_address = current_block;
+        
+        for (int i = 0; i < required_blocks; i++) {
+            new_allocation_table[current_block + i] = 1;
         }
-        current = current->next;
-    }
-
-    current = sm->file_list;
-    while (current != NULL) {
-        if (current->metadata.global_org == CHAINED) {
-            int blocks_needed = current->metadata.size_in_blocks;
-            current->metadata.first_block_address = current_block;
-            for (int i = 0; i < blocks_needed; i++) {
-                new_allocation_table[current_block + i] = 1;
-                current_block++;
-            }
-        }
+        current_block += required_blocks;
         current = current->next;
     }
     
     free(sm->allocation_table);
     sm->allocation_table = new_allocation_table;
 }
-
 
 void clear_memory(SecondaryMemory *sm) {
     File *current = sm->file_list;
