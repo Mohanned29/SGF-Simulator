@@ -56,7 +56,7 @@ typedef struct SecondaryMemory {
 
 
 void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size, char *buffer);
-void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice, char *buffer);
+bool create_file(SecondaryMemory *sm, const char *filename, GlobalOrganization global_org, InternalOrganization internal_org, char *error_msg);
 File* find_file(SecondaryMemory *sm, const char *filename, char *buffer);
 void display_memory_state(SecondaryMemory *sm);
 void display_file_metadata(SecondaryMemory *sm);

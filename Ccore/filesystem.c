@@ -90,82 +90,48 @@ void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int bloc
 }
 
 
+int find_free_block(SecondaryMemory *sm) {
+    for (int i = 0; i < sm->total_blocks; i++) {
+        if (sm->allocation_table[i] == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
 
-void create_file(SecondaryMemory *sm, const char *filename, int num_records, int global_org_choice, int internal_org_choice, char *buffer) {
-    GlobalOrganization global_org = (global_org_choice == 1) ? CONTIGUOUS : CHAINED;
-    InternalOrganization internal_org = (internal_org_choice == 1) ? UNSORTED : SORTED;
-
-    if (find_file(sm, filename, buffer) != NULL) {
-        snprintf(buffer, BUFFER_SIZE, "File '%s' already exists.\n", filename);
-        printf("%s", buffer);
-        return;
+bool create_file(SecondaryMemory *sm, const char *filename, GlobalOrganization global_org, InternalOrganization internal_org, char *error_msg) {
+    if (find_file(sm, filename, error_msg) != NULL) {
+        strcpy(error_msg, "File already exists");
+        return false;
     }
 
     File *new_file = (File *)malloc(sizeof(File));
     strcpy(new_file->metadata.filename, filename);
-    new_file->metadata.size_in_records = num_records;
+    new_file->metadata.size_in_records = 0;
     new_file->metadata.global_org = global_org;
     new_file->metadata.internal_org = internal_org;
     new_file->next = NULL;
 
-    int records_per_block = sm->block_size / sizeof(Record);
-    if (records_per_block == 0) {
-        snprintf(buffer, BUFFER_SIZE, "Error: Block size (%d bytes) is too small for a record (%lu bytes).\n", sm->block_size, sizeof(Record));
-        printf("%s", buffer);
-        free(new_file);
-        return;
-    }
-
-    int blocks_needed = (num_records + records_per_block - 1) / records_per_block;
-    int blocks_allocated = 0;
     int first_block = -1;
-
     if (global_org == CONTIGUOUS) {
-        for (int i = 0; i <= sm->total_blocks - blocks_needed; i++) {
-            int j;
-            for (j = 0; j < blocks_needed; j++) {
-                if (sm->allocation_table[i + j] != 0) {
-                    break;
-                }
-            }
-            if (j == blocks_needed) {
-                first_block = i;
-                for (j = 0; j < blocks_needed; j++) {
-                    sm->allocation_table[i + j] = 1;
-                }
-                blocks_allocated = blocks_needed;
-                break;
-            }
+        first_block = find_free_block(sm);
+        if (first_block != -1) {
+            sm->allocation_table[first_block] = 1;
         }
-        if (blocks_allocated == 0) {
-            snprintf(buffer, BUFFER_SIZE, "Not enough contiguous space available.\n");
-            printf("%s", buffer);
-            free(new_file);
-            return;
+    } else {
+        first_block = find_free_block(sm);
+        if (first_block != -1) {
+            sm->allocation_table[first_block] = 1;
         }
-    } else if (global_org == CHAINED) {
-        int *block_addresses = (int *)malloc(sizeof(int) * blocks_needed);
-        for (int i = 0; i < sm->total_blocks && blocks_allocated < blocks_needed; i++) {
-            if (sm->allocation_table[i] == 0) {
-                sm->allocation_table[i] = 1;
-                block_addresses[blocks_allocated++] = i;
-            }
-        }
-        if (blocks_allocated < blocks_needed) {
-            snprintf(buffer, BUFFER_SIZE, "Not enough space available.\n");
-            printf("%s", buffer);
-            for (int i = 0; i < blocks_allocated; i++) {
-                sm->allocation_table[block_addresses[i]] = 0;
-            }
-            free(block_addresses);
-            free(new_file);
-            return;
-        }
-        first_block = block_addresses[0];
-        free(block_addresses);
     }
 
-    new_file->metadata.size_in_blocks = blocks_allocated;
+    if (first_block == -1) {
+        strcpy(error_msg, "No free blocks available");
+        free(new_file);
+        return false;
+    }
+
+    new_file->metadata.size_in_blocks = 1;
     new_file->metadata.first_block_address = first_block;
 
     if (sm->file_list == NULL) {
@@ -182,31 +148,17 @@ void create_file(SecondaryMemory *sm, const char *filename, int num_records, int
     new_file->next = sm->hash_table[index];
     sm->hash_table[index] = new_file;
 
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen(filename, "wb");
     if (fp == NULL) {
-        snprintf(buffer, BUFFER_SIZE, "Error creating file '%s'.\n", filename);
-        printf("%s", buffer);
-        if (global_org == CONTIGUOUS) {
-            for (int i = first_block; i < first_block + blocks_allocated; i++) {
-                sm->allocation_table[i] = 0;
-            }
-        }
+        strcpy(error_msg, "Error creating file");
+        sm->allocation_table[first_block] = 0;
         free(new_file);
-        return;
-    }
-
-    Record record;
-    for (int i = 0; i < num_records; i++) {
-        record.id = i + 1;
-        sprintf(record.data, "Sample Data %d", i + 1);
-        fwrite(&record, sizeof(Record), 1, fp);
+        return false;
     }
     fclose(fp);
 
-    snprintf(buffer, BUFFER_SIZE, "File '%s' created successfully.\n", filename);
-    printf("%s", buffer);
+    return true;
 }
-
 
 
 void display_memory_state(SecondaryMemory *sm) {
@@ -246,7 +198,6 @@ Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, 
     unsigned int index = hash_function(filename);
     File *file = sm->hash_table[index];
     
-    // Search in hash table chain
     while (file != NULL && strcmp(file->metadata.filename, filename) != 0) {
         file = file->next;
     }
@@ -289,16 +240,6 @@ Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, 
     }
 }
 
-
-
-int find_free_block(SecondaryMemory *sm) {
-    for (int i = 0; i < sm->total_blocks; i++) {
-        if (sm->allocation_table[i] == 0) {
-            return i;
-        }
-    }
-    return -1;
-}
 
 void update_memory_allocation(SecondaryMemory *sm, File *file) {
     int records_per_block = sm->block_size / sizeof(Record);
