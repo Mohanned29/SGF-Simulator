@@ -495,7 +495,6 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
-
 void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     DrawCenteredText("Memory State", 50, 40, DARKBLUE);
 
@@ -505,13 +504,49 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     int startX = (GetScreenWidth() - (blocksPerRow * (blockSize + padding))) / 2;
     int startY = 150;
     
+    Color fileColors[] = {
+        RED, BLUE, PURPLE, ORANGE, BROWN, 
+        PINK, MAROON, DARKBLUE, DARKPURPLE, DARKBROWN
+    };
+    int numColors = sizeof(fileColors) / sizeof(fileColors[0]);
+    
+    
+    Color* blockColors = (Color*)malloc(sm->total_blocks * sizeof(Color));
+    for (int i = 0; i < sm->total_blocks; i++) {
+        blockColors[i] = GREEN;
+    }
+    
+    int colorIndex = 0;
+    int lastUsedBlock = -1;
+    File* current = sm->file_list;
+    
+    while (current != NULL) {
+        Color fileColor = fileColors[colorIndex % numColors];
+        
+        if (current->metadata.global_org == CONTIGUOUS) {
+            for (int i = current->metadata.first_block_address; 
+                 i < current->metadata.first_block_address + current->metadata.size_in_blocks; 
+                 i++) {
+                blockColors[i] = fileColor;
+                lastUsedBlock = (i > lastUsedBlock) ? i : lastUsedBlock;
+            }
+        } else {
+            int startBlock = (lastUsedBlock + 1);
+            for (int i = 0; i < current->metadata.size_in_blocks; i++) {
+                blockColors[startBlock + i] = fileColor;
+                lastUsedBlock = startBlock + i;
+            }
+        }
+        colorIndex++;
+        current = current->next;
+    }
+    
     for (int i = 0; i < sm->total_blocks; i++) {
         int row = i / blocksPerRow;
         int col = i % blocksPerRow;
         int x = startX + col * (blockSize + padding);
         int y = startY + row * (blockSize + padding);
-        Color blockColor = sm->allocation_table[i] == 0 ? GREEN : RED;
-        DrawRectangle(x, y, blockSize, blockSize, blockColor);
+        DrawRectangle(x, y, blockSize, blockSize, blockColors[i]);
         char blockNum[5];
         snprintf(blockNum, sizeof(blockNum), "%d", i);
         int textWidth = MeasureText(blockNum, 20);
@@ -520,17 +555,33 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     
     DrawRectangle(startX, startY - 60, 20, 20, GREEN);
     DrawText("Free", startX + 30, startY - 60, 20, BLACK);
-    DrawRectangle(startX + 150, startY - 60, 20, 20, RED);
-    DrawText("Occupied", startX + 180, startY - 60, 20, BLACK);
+    
+    current = sm->file_list;
+    colorIndex = 0;
+    int legendX = startX + 150;
+    while (current != NULL && colorIndex < numColors) {
+        DrawRectangle(legendX, startY - 60, 20, 20, fileColors[colorIndex]);
+        DrawText(current->metadata.filename, legendX + 30, startY - 60, 20, BLACK);
+        legendX += 150;
+        colorIndex++;
+        current = current->next;
+    }
+    
     int occupiedBlocks = 0;
     for (int i = 0; i < sm->total_blocks; i++) {
         if (sm->allocation_table[i] == 1) occupiedBlocks++;
     }
     char stats[100];
-    snprintf(stats, sizeof(stats), "Total Blocks: %d | Occupied: %d | Free: %d", sm->total_blocks, occupiedBlocks, sm->total_blocks - occupiedBlocks);
+    snprintf(stats, sizeof(stats), "Total Blocks: %d | Occupied: %d | Free: %d", 
+             sm->total_blocks, occupiedBlocks, sm->total_blocks - occupiedBlocks);
     DrawText(stats, startX, startY - 100, 20, BLACK);
 
-    DrawText("Press SPACE to return to main menu", GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2, GetScreenHeight() - 50, 20, DARKGRAY);
+    DrawText("Press SPACE to return to main menu", 
+             GetScreenWidth()/2 - MeasureText("Press SPACE to return to main menu", 20)/2, 
+             GetScreenHeight() - 50, 20, DARKGRAY);
+    
+    free(blockColors);
+    
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
