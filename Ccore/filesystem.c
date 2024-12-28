@@ -161,21 +161,19 @@ bool create_file(SecondaryMemory *sm, const char *filename, GlobalOrganization g
 }
 
 
-void display_memory_state(SecondaryMemory *sm) {
-    printf("\nMemory State:\n");
+void display_memory_state(SecondaryMemory *sm, char* buffer) {
+    int offset = 0;
+    offset += snprintf(buffer + offset, BUFFER_SIZE - offset, "Memory State:\n");
+    
     for (int i = 0; i < sm->total_blocks; i++) {
-        printf("[Block %d: %s] ", i, sm->allocation_table[i] == 0 ? "Free" : "Occupied");
-
-        // Calculate records per block for a block size of 512 and record size of 260 bytes (example).
-        // records_per_block = block_size / record_size
-        // records_per_block = 512 / 260 ≈ 1.96
+        offset += snprintf(buffer + offset, BUFFER_SIZE - offset, "[Block %d: %s] ",i, sm->allocation_table[i] == 0 ? "Free" : "Occupied");
 
         if ((i + 1) % 10 == 0) {
-            printf("\n");
+            offset += snprintf(buffer + offset, BUFFER_SIZE - offset, "\n");
         }
     }
-    printf("\n");
 }
+
 
 void display_file_metadata(SecondaryMemory *sm) {
     printf("\nFile Metadata:\n");

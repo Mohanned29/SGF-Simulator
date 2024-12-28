@@ -55,17 +55,17 @@ typedef struct SecondaryMemory {
 } SecondaryMemory;
 
 
-void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size, char *buffer);
+void initialize_secondary_memory(SecondaryMemory *sm, int total_blocks, int block_size, char *buffer); 
 bool create_file(SecondaryMemory *sm, const char *filename, GlobalOrganization global_org, InternalOrganization internal_org, char *error_msg);
 File* find_file(SecondaryMemory *sm, const char *filename, char *buffer);
-void display_memory_state(SecondaryMemory *sm);
+void display_memory_state(SecondaryMemory *sm, char* buffer); // kayen
 void display_file_metadata(SecondaryMemory *sm);
 Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, bool* success, char* error_msg);
-void insert_record(SecondaryMemory *sm);
+void insert_record(SecondaryMemory *sm); //mkch
 char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, char* buffer);
 void defragment_file(SecondaryMemory *sm);
 void delete_file(SecondaryMemory *sm);
-void rename_file(SecondaryMemory *sm);
+void rename_file(SecondaryMemory *sm); //mkch
 void compact_memory(SecondaryMemory *sm);
 void clear_memory(SecondaryMemory *sm);
 void free_secondary_memory(SecondaryMemory *sm);

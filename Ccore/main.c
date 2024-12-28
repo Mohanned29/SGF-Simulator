@@ -496,6 +496,9 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
 }
 
 void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
+
+    static char memoryStateBuffer[BUFFER_SIZE];
+    display_memory_state(sm, memoryStateBuffer);
     DrawCenteredText("Memory State", 50, 40, DARKBLUE);
 
     int blockSize = 50;
@@ -505,16 +508,20 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     int startY = 150;
     
     Color fileColors[] = {
-        RED, BLUE, PURPLE, ORANGE, BROWN, 
+        RED, BLUE, PURPLE, ORANGE, BROWN,
         PINK, MAROON, DARKBLUE, DARKPURPLE, DARKBROWN
     };
     int numColors = sizeof(fileColors) / sizeof(fileColors[0]);
-    
     
     Color* blockColors = (Color*)malloc(sm->total_blocks * sizeof(Color));
     for (int i = 0; i < sm->total_blocks; i++) {
         blockColors[i] = GREEN;
     }
+    
+    float records_per_block = (float)sm->block_size / sizeof(Record);
+    char recordsInfo[32];
+    snprintf(recordsInfo, sizeof(recordsInfo), "Records per block: %.2f", records_per_block);
+    DrawText(recordsInfo, startX, startY - 140, 20, BLACK);
     
     int colorIndex = 0;
     int lastUsedBlock = -1;
@@ -540,7 +547,7 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
         colorIndex++;
         current = current->next;
     }
-    
+
     for (int i = 0; i < sm->total_blocks; i++) {
         int row = i / blocksPerRow;
         int col = i % blocksPerRow;
@@ -552,10 +559,10 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
         int textWidth = MeasureText(blockNum, 20);
         DrawText(blockNum, x + (blockSize - textWidth)/2, y + blockSize/3, 20, WHITE);
     }
-    
+
     DrawRectangle(startX, startY - 60, 20, 20, GREEN);
     DrawText("Free", startX + 30, startY - 60, 20, BLACK);
-    
+
     current = sm->file_list;
     colorIndex = 0;
     int legendX = startX + 150;
