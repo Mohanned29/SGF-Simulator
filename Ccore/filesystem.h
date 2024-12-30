@@ -61,7 +61,7 @@ File* find_file(SecondaryMemory *sm, const char *filename, char *buffer);
 void display_memory_state(SecondaryMemory *sm, char* buffer); // kayen
 void display_file_metadata(SecondaryMemory *sm);
 Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, bool* success, char* error_msg);
-void insert_record(SecondaryMemory *sm); //mkch
+bool insert_record(SecondaryMemory *sm, const char* filename, int record_id, const char* record_data, char* error_msg);
 char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, char* buffer);
 void defragment_file(SecondaryMemory *sm);
 void delete_file(SecondaryMemory *sm);

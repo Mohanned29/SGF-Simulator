@@ -646,7 +646,6 @@ void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
-
 void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
     static char record_id[32] = "";
@@ -655,7 +654,8 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     static bool showError = false;
     static bool showSuccess = false;
     static char message[256] = "";
-
+    static float messageTimer = 0.0f;
+    
     DrawCenteredText("Insert New Record", 50, 40, DARKBLUE);
 
     int inputWidth = 300;
@@ -689,8 +689,9 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
 
     if (active_input > 0) {
         int key = GetCharPressed();
-        char *currentInput = (active_input == 1) ? filename : (active_input == 2) ? record_id : record_data;
-        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 :
+        char *currentInput = (active_input == 1) ? filename : 
+                           (active_input == 2) ? record_id : record_data;
+        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 
                     (active_input == 2) ? 31 : 255;
         
         while (key > 0) {
@@ -706,66 +707,48 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
             currentInput[strlen(currentInput) - 1] = '\0';
         }
     }
-    Rectangle submitBtn = {450, startY + 300, inputWidth, 50};
-    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), submitBtn);
-    DrawRectangleRec(submitBtn, btnHovered ? DARKBLUE : BLUE);
+
+    Rectangle insertBtn = {450, startY + 300, inputWidth, 50};
+    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), insertBtn);
+    DrawRectangleRec(insertBtn, btnHovered ? DARKBLUE : BLUE);
     DrawText("Insert Record", 520, startY + 315, 20, WHITE);
+
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id) > 0 && strlen(record_data) > 0) {
-            char buffer[BUFFER_SIZE];
-            File *file = find_file(sm, filename, buffer);
-            
-            if (file != NULL) {
-                FILE *fp = fopen(filename, "ab");
-                if (fp != NULL) {
-                    Record new_record;
-                    new_record.id = atoi(record_id);
-                    strncpy(new_record.data, record_data, 255);
-                    new_record.data[255] = '\0';
-                    
-                    if (fwrite(&new_record, sizeof(Record), 1, fp) == 1) {
-                        file->metadata.size_in_records++;
-                        update_memory_allocation(sm, file);
-                        showSuccess = true;
-                        showError = false;
-                        strcpy(message, "Record inserted successfully!");
-                        filename[0] = '\0';
-                        record_id[0] = '\0';
-                        record_data[0] = '\0';
-                    } else {
-                        showError = true;
-                        showSuccess = false;
-                        strcpy(message, "Error writing record to file.");
-                    }
-                    fclose(fp);
-                } else {
-                    showError = true;
-                    showSuccess = false;
-                    strcpy(message, "Error opening file.");
-                }
+            bool success;
+            char error_msg[256];
+            if (insert_record(sm, filename, atoi(record_id), record_data, error_msg)) {
+                showSuccess = true;
+                showError = false;
+                strcpy(message, "Record inserted successfully!");
+                filename[0] = '\0';
+                record_id[0] = '\0';
+                record_data[0] = '\0';
             } else {
                 showError = true;
                 showSuccess = false;
-                strcpy(message, "File not found.");
+                strcpy(message, error_msg);
             }
+            messageTimer = 2.0f;
         } else {
             showError = true;
             showSuccess = false;
-            strcpy(message, "Please fill all fields.");
+            strcpy(message, "Please fill all fields!");
+            messageTimer = 2.0f;
         }
     }
-    if (showSuccess) {
-        DrawText(message, 450, startY + 370, 20, GREEN);
-    } else if (showError) {
-        DrawText(message, 450, startY + 370, 20, RED);
+
+    if (messageTimer > 0) {
+        DrawText(message, 450, startY + 370, 20, showError ? RED : GREEN);
+        messageTimer -= GetFrameTime();
     }
-    
 
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
     }
 }
+
 
 void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";

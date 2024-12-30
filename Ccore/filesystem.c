@@ -256,43 +256,36 @@ void update_memory_allocation(SecondaryMemory *sm, File *file) {
 
 
 
-
-void insert_record(SecondaryMemory *sm) {
-    char filename[MAX_FILENAME];
-    printf("Enter the file name to insert into: ");
-    scanf("%s", filename);
-
-    File *file = find_file(sm, filename, buffer);
-
+bool insert_record(SecondaryMemory *sm, const char* filename, int record_id, const char* record_data, char* error_msg) {
+    File *file = find_file(sm, filename, error_msg);
     if (file == NULL) {
-        printf("File '%s' not found.\n", filename);
-        return;
+        strcpy(error_msg, "File not found");
+        return false;
     }
 
     FILE *fp = fopen(filename, "ab");
     if (fp == NULL) {
-        printf("Error opening file '%s'.\n", filename);
-        return;
+        strcpy(error_msg, "Error opening file");
+        return false;
     }
 
     Record new_record;
-    printf("Enter Record ID: ");
-    scanf("%d", &new_record.id);
-    printf("Enter Record Data: ");
-    scanf("%s", new_record.data);
+    new_record.id = record_id;
+    strncpy(new_record.data, record_data, 255);
+    new_record.data[255] = '\0';
 
     if (fwrite(&new_record, sizeof(Record), 1, fp) != 1) {
-        printf("Error writing record to file.\n");
+        strcpy(error_msg, "Error writing record to file");
         fclose(fp);
-        return;
+        return false;
     }
 
     fclose(fp);
     file->metadata.size_in_records++;
     update_memory_allocation(sm, file);
-
-    printf("Record inserted successfully into file '%s'.\n", filename);
+    return true;
 }
+
 
 
 char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, char* buffer) {
