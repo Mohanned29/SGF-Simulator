@@ -329,17 +329,56 @@ char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, ch
     }
 }
 
-void defragment_file(SecondaryMemory *sm) {
-    char filename[MAX_FILENAME];
-    printf("Enter the file name to defragment: ");
-    scanf("%s", filename);
-    File *file = find_file(sm, filename, buffer);
+
+bool defragment_file(SecondaryMemory *sm, const char* filename, char* error_msg) {
+    File *file = find_file(sm, filename, error_msg);
     if (file == NULL) {
-        printf("File '%s' not found.\n", filename);
-        return;
+        strcpy(error_msg, "File not found");
+        return false;
     }
 
-    printf("Defragmentation completed for file '%s'.\n", filename);
+    if (file->metadata.global_org != CHAINED) {
+        strcpy(error_msg, "Only chained files need defragmentation");
+        return false;
+    }
+
+    int blocks_needed = file->metadata.size_in_blocks;
+    int new_start_block = -1;
+    
+    for (int i = 0; i <= sm->total_blocks - blocks_needed; i++) {
+        bool space_available = true;
+        for (int j = 0; j < blocks_needed; j++) {
+            if (sm->allocation_table[i + j] != 0) {
+                space_available = false;
+                i = i + j;
+                break;
+            }
+        }
+        if (space_available) {
+            new_start_block = i;
+            break;
+        }
+    }
+
+    if (new_start_block == -1) {
+        strcpy(error_msg, "No contiguous space available for defragmentation");
+        return false;
+    }
+
+    for (int i = 0; i < sm->total_blocks; i++) {
+        if (sm->allocation_table[i] == 1) {
+            sm->allocation_table[i] = 0;
+        }
+    }
+
+    for (int i = 0; i < blocks_needed; i++) {
+        sm->allocation_table[new_start_block + i] = 1;
+    }
+
+    file->metadata.first_block_address = new_start_block;
+    file->metadata.global_org = CONTIGUOUS;
+
+    return true;
 }
 
 

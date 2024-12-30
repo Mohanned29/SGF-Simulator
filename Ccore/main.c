@@ -843,6 +843,7 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
     static bool showResult = false;
     static bool showError = false;
     static char message[256] = "";
+    static float messageTimer = 0.0f;
     
     DrawCenteredText("Defragment File", 50, 40, DARKBLUE);
     
@@ -884,13 +885,11 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), defragBtn);
     DrawRectangleRec(defragBtn, btnHovered ? DARKBLUE : BLUE);
     DrawText("Defragment File", 500, startY + 115, 20, WHITE);
-    
+
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0) {
-            char buffer[BUFFER_SIZE];
-            File *file = find_file(sm, filename, buffer);
-            
-            if (file != NULL) {
+            char error_msg[256];
+            if (defragment_file(sm, filename, error_msg)) {
                 showResult = true;
                 showError = false;
                 sprintf(message, "Defragmentation completed for file '%s'", filename);
@@ -898,23 +897,28 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
             } else {
                 showError = true;
                 showResult = false;
-                sprintf(message, "File '%s' not found", filename);
+                strcpy(message, error_msg);
             }
+            messageTimer = 2.0f;
         } else {
             showError = true;
             showResult = false;
             strcpy(message, "Please enter a filename");
+            messageTimer = 2.0f;
         }
     }
-
-    if (showResult || showError) {
+    
+    if (messageTimer > 0) {
         DrawText(message, 450, startY + 180, 20, showError ? RED : GREEN);
+        messageTimer -= GetFrameTime();
     }
+
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
     }
 }
+
 
 
 void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
