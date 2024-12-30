@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-
+#include <unistd.h>
 #define BUFFER_SIZE 512
 char buffer[BUFFER_SIZE];
 
@@ -286,48 +286,72 @@ bool insert_record(SecondaryMemory *sm, const char* filename, int record_id, con
     return true;
 }
 
-
-
-char* delete_record(SecondaryMemory *sm, const char* filename, int record_id, char* buffer) {
-    File *file = find_file(sm, filename, buffer);
+bool delete_record(SecondaryMemory *sm, const char* filename, int record_id, bool is_physical, char* error_msg) {
+    File *file = find_file(sm, filename, error_msg);
     if (file == NULL) {
-        return "File not found";
+        strcpy(error_msg, "File not found");
+        return false;
     }
 
-    FILE *fp = fopen(filename, "rb");
+    FILE *fp = fopen(filename, "rb+");
     if (fp == NULL) {
-        return "Error opening file";
+        strcpy(error_msg, "Error opening file");
+        return false;
     }
 
-    Record *records = malloc(sizeof(Record) * file->metadata.size_in_records);
-    int count = 0;
-    int found = 0;
+    if (is_physical) {
+        Record *records = malloc(sizeof(Record) * file->metadata.size_in_records);
+        int count = 0;
+        int found = 0;
+        Record temp;
 
-    while (fread(&records[count], sizeof(Record), 1, fp)) {
-        if (records[count].id == record_id) {
-            found = 1;
-        } else {
-            count++;
+        //read all valid records (not logically deleted)
+        while (fread(&temp, sizeof(Record), 1, fp)) {
+            if (temp.id == record_id) {
+                if (temp.is_deleted) {
+                    found = 1;
+                } else {
+                    strcpy(error_msg, "Record must be logically deleted first");
+                    free(records);
+                    fclose(fp);
+                    return false;
+                }
+            } else if (!temp.is_deleted) {
+                records[count++] = temp;
+            }
         }
-    }
-    fclose(fp);
-
-    if (found) {
-        fp = fopen(filename, "wb");
-        if (fp == NULL) {
+        
+        if (found) {
+            rewind(fp);
+            fwrite(records, sizeof(Record), count, fp);
+            ftruncate(fileno(fp), count * sizeof(Record));
+            file->metadata.size_in_records--;
             free(records);
-            return "Error writing to file";
+            fclose(fp);
+            strcpy(error_msg, "Record physically deleted");
+            return true;
         }
-        fwrite(records, sizeof(Record), count, fp);
-        fclose(fp);
-        file->metadata.size_in_records--;
         free(records);
-        return "Record deleted successfully";
     } else {
-        free(records);
-        return "Record not found";
+        Record record;
+        while (fread(&record, sizeof(Record), 1, fp)) {
+            if (record.id == record_id && !record.is_deleted) {
+                record.is_deleted = true;
+                fseek(fp, -(long)sizeof(Record), SEEK_CUR);
+                fwrite(&record, sizeof(Record), 1, fp);
+                fclose(fp);
+                strcpy(error_msg, "Record logically deleted");
+                return true;
+            }
+        }
     }
+    
+    fclose(fp);
+    strcpy(error_msg, "Record not found");
+    return false;
 }
+
+
 
 
 bool defragment_file(SecondaryMemory *sm, const char* filename, char* error_msg) {

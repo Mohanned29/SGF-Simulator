@@ -749,7 +749,6 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
-
 void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
     static char record_id_input[32] = "";
@@ -757,10 +756,11 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     static bool showResult = false;
     static bool showError = false;
     static char message[256] = "";
-    static char buffer[BUFFER_SIZE];
+    static bool is_physical = true;
+    static float messageTimer = 0.0f;
     
     DrawCenteredText("Delete Record", 50, 40, DARKBLUE);
-    
+
     int inputWidth = 300;
     int inputHeight = 40;
     int startY = 150;
@@ -771,17 +771,29 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     DrawRectangleLinesEx(filenameBox, 2, BLUE);
     DrawText(filename, 460, startY + 40, 20, BLACK);
 
-    DrawText("Entrer le matricule:", 450, startY + 100, 20, BLACK);
+    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
     DrawText(record_id_input, 460, startY + 140, 20, BLACK);
 
+    DrawText("Select Deletion Type:", 450, startY + 180, 20, BLACK);
+    Rectangle physicalBtn = {450, startY + 210, inputWidth/2 - 5, 40};
+    Rectangle logicalBtn = {450 + inputWidth/2 + 5, startY + 210, inputWidth/2 - 5, 40};
+    
+    DrawRectangleRec(physicalBtn, is_physical ? DARKBLUE : BLUE);
+    DrawRectangleRec(logicalBtn, !is_physical ? DARKBLUE : BLUE);
+    DrawText("Physical", 460, startY + 220, 20, WHITE);
+    DrawText("Logical", 460 + inputWidth/2 + 5, startY + 220, 20, WHITE);
+
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) active_input = 1;
         else if (CheckCollisionPointRec(GetMousePosition(), idBox)) active_input = 2;
+        else if (CheckCollisionPointRec(GetMousePosition(), physicalBtn)) is_physical = true;
+        else if (CheckCollisionPointRec(GetMousePosition(), logicalBtn)) is_physical = false;
         else active_input = 0;
     }
+
     if (active_input > 0) {
         int key = GetCharPressed();
         char *currentInput = (active_input == 1) ? filename : record_id_input;
@@ -801,16 +813,15 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
         }
     }
 
-    Rectangle deleteBtn = {450, startY + 200, inputWidth, 50};
+    Rectangle deleteBtn = {450, startY + 270, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), deleteBtn);
     DrawRectangleRec(deleteBtn, btnHovered ? DARKBROWN : RED);
-    DrawText("Delete Student", 520, startY + 215, 20, WHITE);
+    DrawText("Delete Record", 520, startY + 285, 20, WHITE);
 
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
-            const char* result = delete_record(sm, filename, atoi(record_id_input), buffer);
-            
-            if (strstr(result, "successfully")) {
+            char error_msg[256];
+            if (delete_record(sm, filename, atoi(record_id_input), is_physical, error_msg)) {
                 showResult = true;
                 showError = false;
                 filename[0] = '\0';
@@ -819,15 +830,18 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
                 showResult = false;
                 showError = true;
             }
-            strcpy(message, result);
+            strcpy(message, error_msg);
+            messageTimer = 2.0f;
         } else {
             showError = true;
             strcpy(message, "Please fill all fields!");
+            messageTimer = 2.0f;
         }
     }
 
-    if (showResult || showError) {
-        DrawText(message, 450, startY + 280, 20, showError ? RED : GREEN);
+    if (messageTimer > 0) {
+        DrawText(message, 450, startY + 340, 20, showError ? RED : GREEN);
+        messageTimer -= GetFrameTime();
     }
 
     if (IsKeyPressed(KEY_SPACE)) {
@@ -907,7 +921,7 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
             messageTimer = 2.0f;
         }
     }
-    
+
     if (messageTimer > 0) {
         DrawText(message, 450, startY + 180, 20, showError ? RED : GREEN);
         messageTimer -= GetFrameTime();
