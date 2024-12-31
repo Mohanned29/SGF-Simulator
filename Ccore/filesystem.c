@@ -262,8 +262,8 @@ bool insert_record(SecondaryMemory *sm, const char* filename, int record_id, con
 
     Record new_record;
     new_record.id = record_id;
-    strncpy(new_record.data, record_data, 255);
-    new_record.data[255] = '\0';
+    strncpy(new_record.name, record_data, 255);
+    new_record.name[255] = '\0';
 
     if (fwrite(&new_record, sizeof(Record), 1, fp) != 1) {
         strcpy(error_msg, "Error writing record to file");

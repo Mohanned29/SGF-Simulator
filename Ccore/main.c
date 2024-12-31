@@ -483,7 +483,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
             char resultText[100];
             snprintf(resultText, sizeof(resultText), "Record ID: %d", found_record.id);
             DrawText(resultText, 370, startY + 300, 20, Fade(BLACK, alpha));
-            DrawText(found_record.data, 370, startY + 330, 20, Fade(BLACK, alpha));
+            DrawText(found_record.name, 370, startY + 330, 20, Fade(BLACK, alpha));
         } else {
             DrawText(message, 370, startY + 315, 20, Fade(RED, alpha));
         }

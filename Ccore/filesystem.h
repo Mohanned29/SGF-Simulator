@@ -24,10 +24,10 @@ typedef enum {
     SORTED
 } InternalOrganization;
 
-
 typedef struct {
     int id;
-    char data[256];
+    int matricule;
+    char name[256];
     bool is_deleted;
 } Record;
 
