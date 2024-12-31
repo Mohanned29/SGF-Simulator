@@ -191,15 +191,8 @@ void display_file_metadata(SecondaryMemory *sm) {
     }
 }
 
-
 Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, bool* success, char* error_msg) {
-    unsigned int index = hash_function(filename);
-    File *file = sm->hash_table[index];
-    
-    while (file != NULL && strcmp(file->metadata.filename, filename) != 0) {
-        file = file->next;
-    }
-    
+    File *file = find_file(sm, filename, error_msg);
     if (file == NULL) {
         *success = false;
         strcpy(error_msg, "File not found");
@@ -212,20 +205,18 @@ Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, 
         strcpy(error_msg, "Error opening file");
         return NULL;
     }
-    /*
-    exemple
-        if:
-        sizeof(Record) = 260 bytes
-        record_id = 3
-        Then:
-        Offset = (3-1) * 260 = 520 bytes
-        fseek moves directly to byte 520
-        The next fread will get the third record
-    */
+    
     Record* record = (Record*)malloc(sizeof(Record));
     fseek(fp, (record_id - 1) * sizeof(Record), SEEK_SET);
     
     if (fread(record, sizeof(Record), 1, fp) == 1) {
+        if (record->is_deleted) {
+            *success = false;
+            strcpy(error_msg, "Record has been deleted");
+            free(record);
+            fclose(fp);
+            return NULL;
+        }
         *success = true;
         fclose(fp);
         return record;
@@ -305,18 +296,10 @@ bool delete_record(SecondaryMemory *sm, const char* filename, int record_id, boo
         int found = 0;
         Record temp;
 
-        //read all valid records (not logically deleted)
         while (fread(&temp, sizeof(Record), 1, fp)) {
             if (temp.id == record_id) {
-                if (temp.is_deleted) {
-                    found = 1;
-                } else {
-                    strcpy(error_msg, "Record must be logically deleted first");
-                    free(records);
-                    fclose(fp);
-                    return false;
-                }
-            } else if (!temp.is_deleted) {
+                found = 1;
+            } else {
                 records[count++] = temp;
             }
         }
@@ -350,7 +333,6 @@ bool delete_record(SecondaryMemory *sm, const char* filename, int record_id, boo
     strcpy(error_msg, "Record not found");
     return false;
 }
-
 
 
 
