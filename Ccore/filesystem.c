@@ -106,23 +106,19 @@ bool create_file(SecondaryMemory *sm, const char *filename, GlobalOrganization g
     }
 
     File *new_file = (File *)malloc(sizeof(File));
+    if (new_file == NULL) {
+        strcpy(error_msg, "Memory allocation failed for new file");
+        return false;
+    }
     strcpy(new_file->metadata.filename, filename);
     new_file->metadata.size_in_records = 0;
     new_file->metadata.global_org = global_org;
     new_file->metadata.internal_org = internal_org;
     new_file->next = NULL;
 
-    int first_block = -1;
-    if (global_org == CONTIGUOUS) {
-        first_block = find_free_block(sm);
-        if (first_block != -1) {
-            sm->allocation_table[first_block] = 1;
-        }
-    } else {
-        first_block = find_free_block(sm);
-        if (first_block != -1) {
-            sm->allocation_table[first_block] = 1;
-        }
+    int first_block = find_free_block(sm);
+    if (first_block != -1) {
+        sm->allocation_table[first_block] = 1;
     }
 
     if (first_block == -1) {
@@ -148,17 +144,30 @@ bool create_file(SecondaryMemory *sm, const char *filename, GlobalOrganization g
     new_file->next = sm->hash_table[index];
     sm->hash_table[index] = new_file;
 
-    FILE *fp = fopen(filename, "wb");
+    FILE *fp = fopen(filename, "w");
     if (fp == NULL) {
         strcpy(error_msg, "Error creating file");
         sm->allocation_table[first_block] = 0;
+        sm->hash_table[index] = new_file->next;
+        if (sm->file_list == new_file) {
+            sm->file_list = NULL;
+        } else {
+            File *prev = sm->file_list;
+            while (prev->next != new_file) {
+                prev = prev->next;
+            }
+            prev->next = NULL;
+        }
         free(new_file);
         return false;
     }
+
+    fprintf(fp, "ID,Matricule,Name\n");
     fclose(fp);
 
     return true;
 }
+
 
 
 void display_memory_state(SecondaryMemory *sm, char* buffer) {
@@ -191,43 +200,83 @@ void display_file_metadata(SecondaryMemory *sm) {
     }
 }
 
-Record* search_record(SecondaryMemory *sm, const char* filename, int record_id, bool* success, char* error_msg) {
-    File *file = find_file(sm, filename, error_msg);
+
+Record* search_record(SecondaryMemory *sm, const char* filename, int matricule, bool* success, char* error_msg) {
+    unsigned int index = hash_function(filename);
+    File *file = sm->hash_table[index];
+    
+    while (file != NULL) {
+        if (strcmp(file->metadata.filename, filename) == 0) {
+            break;
+        }
+        file = file->next;
+    }
+
     if (file == NULL) {
         *success = false;
         strcpy(error_msg, "File not found");
         return NULL;
     }
-    
-    FILE *fp = fopen(filename, "rb");
+
+    FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
         *success = false;
         strcpy(error_msg, "Error opening file");
         return NULL;
     }
-    
+
+    char line[512];
     Record* record = (Record*)malloc(sizeof(Record));
-    fseek(fp, (record_id - 1) * sizeof(Record), SEEK_SET);
-    
-    if (fread(record, sizeof(Record), 1, fp) == 1) {
-        if (record->is_deleted) {
-            *success = false;
-            strcpy(error_msg, "Record has been deleted");
-            free(record);
-            fclose(fp);
-            return NULL;
-        }
-        *success = true;
+    if (record == NULL) {
+        *success = false;
+        strcpy(error_msg, "Memory allocation failed for record");
         fclose(fp);
+        return NULL;
+    }
+    bool found = false;
+
+    if (fgets(line, sizeof(line), fp) == NULL) {
+        *success = false;
+        strcpy(error_msg, "File is empty");
+        free(record);
+        fclose(fp);
+        return NULL;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+        // Skip logically deleted records
+        if (strstr(line, ",true") != NULL) {
+            continue;
+        }
+
+        int id, mat;
+        char name[256];
+        if (sscanf(line, "%d,%d,%255[^\n]", &id, &mat, name) == 3) {
+            if (mat == matricule) {
+                record->id = id;
+                record->matricule = mat;
+                strncpy(record->name, name, 255);
+                record->name[255] = '\0';
+                record->is_deleted = false;
+                found = true;
+                break;
+            }
+        }
+    }
+
+    fclose(fp);
+
+    if (found) {
+        *success = true;
         return record;
     } else {
         *success = false;
         strcpy(error_msg, "Record not found");
         free(record);
-        fclose(fp);
         return NULL;
     }
 }
+
 
 
 void update_memory_allocation(SecondaryMemory *sm, File *file) {
@@ -246,7 +295,6 @@ void update_memory_allocation(SecondaryMemory *sm, File *file) {
 }
 
 
-
 bool insert_record(SecondaryMemory *sm, const char* filename, int record_id, const char* record_data, char* error_msg) {
     File *file = find_file(sm, filename, error_msg);
     if (file == NULL) {
@@ -254,7 +302,7 @@ bool insert_record(SecondaryMemory *sm, const char* filename, int record_id, con
         return false;
     }
 
-    FILE *fp = fopen(filename, "ab");
+    FILE *fp = fopen(filename, "a");
     if (fp == NULL) {
         strcpy(error_msg, "Error opening file");
         return false;
@@ -262,20 +310,19 @@ bool insert_record(SecondaryMemory *sm, const char* filename, int record_id, con
 
     Record new_record;
     new_record.id = record_id;
+    new_record.matricule = record_id;
     strncpy(new_record.name, record_data, 255);
     new_record.name[255] = '\0';
+    new_record.is_deleted = false;
 
-    if (fwrite(&new_record, sizeof(Record), 1, fp) != 1) {
-        strcpy(error_msg, "Error writing record to file");
-        fclose(fp);
-        return false;
-    }
-
+    fprintf(fp, "%d,%d,%s\n", new_record.id, new_record.matricule, new_record.name);
     fclose(fp);
+
     file->metadata.size_in_records++;
     update_memory_allocation(sm, file);
     return true;
 }
+
 
 bool delete_record(SecondaryMemory *sm, const char* filename, int record_id, bool is_physical, char* error_msg) {
     File *file = find_file(sm, filename, error_msg);
@@ -284,54 +331,96 @@ bool delete_record(SecondaryMemory *sm, const char* filename, int record_id, boo
         return false;
     }
 
-    FILE *fp = fopen(filename, "rb+");
-    if (fp == NULL) {
-        strcpy(error_msg, "Error opening file");
-        return false;
-    }
-
     if (is_physical) {
-        Record *records = malloc(sizeof(Record) * file->metadata.size_in_records);
-        int count = 0;
-        int found = 0;
-        Record temp;
+        FILE *fp = fopen(filename, "r");
+        if (fp == NULL) {
+            strcpy(error_msg, "Error opening file");
+            return false;
+        }
 
-        while (fread(&temp, sizeof(Record), 1, fp)) {
-            if (temp.id == record_id) {
-                found = 1;
-            } else {
-                records[count++] = temp;
+        FILE *temp_fp = fopen("temp.csv", "w");
+        if (temp_fp == NULL) {
+            fclose(fp);
+            strcpy(error_msg, "Error creating temporary file");
+            return false;
+        }
+
+        char line[512];
+        bool found = false;
+
+        if (fgets(line, sizeof(line), fp) != NULL) {
+            fputs(line, temp_fp);
+        }
+
+        while (fgets(line, sizeof(line), fp)) {
+            int id, mat;
+            char name[256];
+            if (sscanf(line, "%d,%d,%255[^\n]", &id, &mat, name) == 3) {
+                if (id == record_id) {
+                    found = true;
+                    continue;
+                }
+                fprintf(temp_fp, "%d,%d,%s\n", id, mat, name);
             }
         }
-        
+
+        fclose(fp);
+        fclose(temp_fp);
+
         if (found) {
-            rewind(fp);
-            fwrite(records, sizeof(Record), count, fp);
-            ftruncate(fileno(fp), count * sizeof(Record));
+            if (remove(filename) != 0 || rename("temp.csv", filename) != 0) {
+                strcpy(error_msg, "Error updating file after deletion");
+                return false;
+            }
             file->metadata.size_in_records--;
-            free(records);
-            fclose(fp);
             strcpy(error_msg, "Record physically deleted");
             return true;
+        } else {
+            remove("temp.csv");
+            strcpy(error_msg, "Record not found");
+            return false;
         }
-        free(records);
     } else {
-        Record record;
-        while (fread(&record, sizeof(Record), 1, fp)) {
-            if (record.id == record_id && !record.is_deleted) {
-                record.is_deleted = true;
-                fseek(fp, -(long)sizeof(Record), SEEK_CUR);
-                fwrite(&record, sizeof(Record), 1, fp);
-                fclose(fp);
-                strcpy(error_msg, "Record logically deleted");
-                return true;
+        FILE *fp = fopen(filename, "r+");
+        if (fp == NULL) {
+            strcpy(error_msg, "Error opening file");
+            return false;
+        }
+
+        char line[512];
+        long pos;
+        bool found = false;
+
+        // Read header
+        if (fgets(line, sizeof(line), fp) == NULL) {
+            fclose(fp);
+            strcpy(error_msg, "File is empty");
+            return false;
+        }
+
+        while ((pos = ftell(fp)) != -1 && fgets(line, sizeof(line), fp)) {
+            int id, mat;
+            char name[256];
+            if (sscanf(line, "%d,%d,%255[^\n]", &id, &mat, name) == 3) {
+                if (id == record_id) {
+                    fseek(fp, pos, SEEK_SET);
+                    fprintf(fp, "%d,%d,%s,true\n", id, mat, name);
+                    found = true;
+                    break;
+                }
             }
         }
+
+        fclose(fp);
+
+        if (found) {
+            strcpy(error_msg, "Record logically deleted");
+            return true;
+        } else {
+            strcpy(error_msg, "Record not found");
+            return false;
+        }
     }
-    
-    fclose(fp);
-    strcpy(error_msg, "Record not found");
-    return false;
 }
 
 
