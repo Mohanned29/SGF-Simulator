@@ -820,7 +820,7 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             char error_msg[256];
-            if (delete_record(sm, filename, atoi(record_id_input), is_physical)) {
+            if (delete_record(sm, filename, atoi(record_id_input), is_physical, message)) {
                 showResult = true;
                 showError = false;
                 filename[0] = '\0';

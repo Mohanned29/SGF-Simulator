@@ -67,7 +67,7 @@ void display_memory_state(SecondaryMemory *sm, char* buffer); // kayen
 void display_file_metadata(SecondaryMemory *sm);
 Record* search_record(SecondaryMemory *sm, const char* filename, int matricule, bool* success);
 bool insert_record(SecondaryMemory *sm, const char* filename, int matricule, const char* name);
-bool delete_record(SecondaryMemory *sm, const char* filename, int matricule, bool is_physical);
+bool delete_record(SecondaryMemory *sm, const char* filename, int matricule, bool is_physical, char* error_msg);
 bool defragment_file(SecondaryMemory *sm, const char* filename, char* error_msg);
 void delete_file(SecondaryMemory *sm);
 void rename_file(SecondaryMemory *sm);
