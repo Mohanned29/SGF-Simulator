@@ -439,7 +439,6 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         }
     }
 
-    // Search Button
     Rectangle searchBtn = {450, startY + 200, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), searchBtn);
     DrawRectangleRec(searchBtn, btnHovered ? DARKBLUE : BLUE);
@@ -450,7 +449,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             bool success;
             char error_msg[100];
-            Record* result = search_record(sm, filename, atoi(record_id_input), &success, error_msg);
+            Record* result = search_record(sm, filename, atoi(record_id_input), &success);
             
             if (success && result != NULL) {
                 showResult = true;
@@ -717,7 +716,7 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
         if (strlen(filename) > 0 && strlen(record_id) > 0 && strlen(record_data) > 0) {
             bool success;
             char error_msg[256];
-            if (insert_record(sm, filename, atoi(record_id), record_data, error_msg)) {
+            if (insert_record(sm, filename, atoi(record_id), record_data)) {
                 showSuccess = true;
                 showError = false;
                 strcpy(message, "Record inserted successfully!");
@@ -821,7 +820,7 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             char error_msg[256];
-            if (delete_record(sm, filename, atoi(record_id_input), is_physical, error_msg)) {
+            if (delete_record(sm, filename, atoi(record_id_input), is_physical)) {
                 showResult = true;
                 showError = false;
                 filename[0] = '\0';
