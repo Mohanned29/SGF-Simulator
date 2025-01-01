@@ -37,9 +37,11 @@ typedef struct FileMetadata {
     int size_in_blocks;
     int size_in_records;
     int first_block_address;
+    int next_id;
     GlobalOrganization global_org;
     InternalOrganization internal_org;
 } FileMetadata;
+
 
 typedef struct File {
     FileMetadata metadata;
