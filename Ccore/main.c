@@ -449,7 +449,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             bool success;
             char *endptr;
-            long matricule = strtol(record_id_input, &endptr, 10);
+            long long matricule = strtoll(record_id_input, &endptr, 10);
             char error_msg[100];
             Record* result = search_record(sm, filename, matricule, &success);
             
@@ -482,7 +482,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         
         if (showResult) {
             char resultText[100];
-            snprintf(resultText, sizeof(resultText), "Matricule: %d", found_record.id);
+            snprintf(resultText, sizeof(resultText), "Record Id: %d", found_record.id);
             DrawText(resultText, 370, startY + 300, 20, Fade(BLACK, alpha));
             DrawText(found_record.name, 370, startY + 330, 20, Fade(BLACK, alpha));
         } else {
@@ -718,7 +718,7 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
         if (strlen(filename) > 0 && strlen(record_id) > 0 && strlen(record_data) > 0) {
             bool success;
             char *endptr;
-            long matricule = strtol(record_id, &endptr, 10);
+            long long matricule = strtoll(record_id, &endptr, 10);
             char error_msg[256];
             if (insert_record(sm, filename, matricule, record_data)) {
                 showSuccess = true;
@@ -825,7 +825,7 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             char error_msg[256];
             char *endptr;
-            long matricule = strtol(record_id_input, &endptr, 10);
+            long long matricule = strtoll(record_id_input, &endptr, 10);
             if (delete_record(sm, filename, matricule, is_physical, message)) {
                 showResult = true;
                 showError = false;

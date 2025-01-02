@@ -192,7 +192,7 @@ void trim_trailing_whitespace(char *str) {
     }
 }
 
-Record* search_record(SecondaryMemory *sm, const char* filename, long matricule, bool* success) {
+Record* search_record(SecondaryMemory *sm, const char* filename,long long matricule, bool* success) {
     if (success) *success = false;
 
     File *file = find_file(sm, filename, buffer);
@@ -217,12 +217,13 @@ Record* search_record(SecondaryMemory *sm, const char* filename, long matricule,
     }
 
     while (fgets(buffer, sizeof(buffer), fp)) {
-        int id, mat;
+        int id; 
+        long long mat;
         char name[256];
         char is_deleted_str[10] = {0};
         bool is_deleted = false;
 
-        int num_fields = sscanf(buffer, "%d,%ld,%255[^,],%9s", &id, &mat, name, is_deleted_str);
+        int num_fields = sscanf(buffer, "%d,%lld,%255[^,],%9s", &id, &mat, name, is_deleted_str);
         if (num_fields < 3) {
             continue;
         }
@@ -281,7 +282,7 @@ void update_memory_allocation(SecondaryMemory *sm, File *file) {
 }
 
 extern char buffer[BUFFER_SIZE];
-bool insert_record(SecondaryMemory *sm, const char* filename, long matricule, const char* name) {
+bool insert_record(SecondaryMemory *sm, const char* filename, long long matricule, const char* name) {
     buffer[0] = '\0';
 
     File *file = find_file(sm, filename, buffer);
@@ -314,7 +315,7 @@ bool insert_record(SecondaryMemory *sm, const char* filename, long matricule, co
     new_record.name[255] = '\0';
     new_record.is_deleted = false;
 
-    fprintf(fp, "%d,%ld,%s,false\n", new_record.id, new_record.matricule, new_record.name);
+    fprintf(fp, "%d,%lld,%s,false\n", new_record.id, new_record.matricule, new_record.name);
     fclose(fp);
 
     file->metadata.size_in_records++;
@@ -328,7 +329,7 @@ bool insert_record(SecondaryMemory *sm, const char* filename, long matricule, co
 
 
 extern char buffer[BUFFER_SIZE];
-bool delete_record(SecondaryMemory *sm, const char* filename, long matricule, bool is_physical, char* error_msg) {
+bool delete_record(SecondaryMemory *sm, const char* filename, long long matricule, bool is_physical, char* error_msg) {
     buffer[0] = '\0';
     
     File *file = find_file(sm, filename, buffer);
@@ -358,21 +359,22 @@ bool delete_record(SecondaryMemory *sm, const char* filename, long matricule, bo
         header_written = true;
     }
     while (fgets(line, sizeof(line), fp)) {
-        int id, mat;
+        int id;
+        long long mat;
         char name[256];
         char is_deleted[10] = "false";
 
-        sscanf(line, "%d,%ld,%[^,\n]", &id, &mat, name);
+        sscanf(line, "%d,%lld,%[^,\n]", &id, &mat, name);
 
         if (mat == matricule) {
             found = true;
             if (is_physical) {
                 continue;
             } else {
-                fprintf(temp_fp, "%d,%ld,%s,true\n", id, mat, name);
+                fprintf(temp_fp, "%d,%lld,%s,true\n", id, mat, name);
             }
         } else {
-            fprintf(temp_fp, "%d,%ld,%s,%s\n", id, mat, name, is_deleted);
+            fprintf(temp_fp, "%d,%lld,%s,%s\n", id, mat, name, is_deleted);
         }
     }
 

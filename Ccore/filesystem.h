@@ -23,7 +23,7 @@ typedef enum {
 
 typedef struct {
     int id;
-    long matricule;
+    long long matricule;
     char name[256];
     bool is_deleted;
 } Record;
@@ -61,9 +61,9 @@ bool create_file(SecondaryMemory *sm, const char *filename, GlobalOrganization g
 File* find_file(SecondaryMemory *sm, const char *filename, char *buffer);
 void display_memory_state(SecondaryMemory *sm, char* buffer); 
 void display_file_metadata(SecondaryMemory *sm);
-Record* search_record(SecondaryMemory *sm, const char* filename, long matricule, bool* success);
-bool insert_record(SecondaryMemory *sm, const char* filename, long matricule, const char* name);
-bool delete_record(SecondaryMemory *sm, const char* filename, long matricule, bool is_physical, char* error_msg);
+Record* search_record(SecondaryMemory *sm, const char* filename, long long matricule, bool* success);
+bool insert_record(SecondaryMemory *sm, const char* filename, long long matricule, const char* name);
+bool delete_record(SecondaryMemory *sm, const char* filename, long long matricule, bool is_physical, char* error_msg);
 bool defragment_file(SecondaryMemory *sm, const char* filename, char* error_msg);
 void delete_file(SecondaryMemory *sm);
 void rename_file(SecondaryMemory *sm);
