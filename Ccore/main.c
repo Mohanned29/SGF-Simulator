@@ -386,7 +386,7 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
 
 void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
-    static char record_id_input[10] = "";
+    static char record_id_input[13] = "";
     static int active_input = 0;
     static bool showResult = false;
     static bool showError = false;
@@ -407,7 +407,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     DrawText(filename, 460, startY + 40, 20, BLACK);
 
     // Record ID Input
-    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
+    DrawText("Enter Matricule :", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
@@ -423,7 +423,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (active_input > 0) {
         int key = GetCharPressed();
         char *currentInput = (active_input == 1) ? filename : record_id_input;
-        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 9;
+        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 12;
         
         while (key > 0) {
             if ((key >= 32 && key <= 126) && strlen(currentInput) < maxLen) {
@@ -448,8 +448,10 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             bool success;
+            char *endptr;
+            long long matricule = strtoll(record_id_input, &endptr, 10);
             char error_msg[100];
-            Record* result = search_record(sm, filename, atoi(record_id_input), &success);
+            Record* result = search_record(sm, filename, matricule, &success);
             
             if (success && result != NULL) {
                 showResult = true;
@@ -480,7 +482,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         
         if (showResult) {
             char resultText[100];
-            snprintf(resultText, sizeof(resultText), "Record ID: %d", found_record.id);
+            snprintf(resultText, sizeof(resultText), "Record Id: %d", found_record.id);
             DrawText(resultText, 370, startY + 300, 20, Fade(BLACK, alpha));
             DrawText(found_record.name, 370, startY + 330, 20, Fade(BLACK, alpha));
         } else {
@@ -667,7 +669,7 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     DrawRectangleLinesEx(filenameBox, 2, BLUE);
     DrawText(filename, 460, startY + 40, 20, BLACK);
 
-    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
+    DrawText("Enter Matricule:", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
@@ -715,8 +717,10 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id) > 0 && strlen(record_data) > 0) {
             bool success;
+            char *endptr;
+            long long matricule = strtoll(record_id, &endptr, 10);
             char error_msg[256];
-            if (insert_record(sm, filename, atoi(record_id), record_data)) {
+            if (insert_record(sm, filename, matricule, record_data)) {
                 showSuccess = true;
                 showError = false;
                 strcpy(message, "Record inserted successfully!");
@@ -820,7 +824,9 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             char error_msg[256];
-            if (delete_record(sm, filename, atoi(record_id_input), is_physical, message)) {
+            char *endptr;
+            long long matricule = strtoll(record_id_input, &endptr, 10);
+            if (delete_record(sm, filename, matricule, is_physical, message)) {
                 showResult = true;
                 showError = false;
                 filename[0] = '\0';

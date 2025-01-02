@@ -1,5 +1,3 @@
-/*        DONE BY JINX          */
-
 #include "filesystem.h"
 #include <io.h>
 #include <stdio.h>
@@ -11,30 +9,8 @@
 #define BUFFER_SIZE 512
 char buffer[BUFFER_SIZE];
 
-/*
-Steps :
-
-1) simple hash process :
-    - it starts with an initial value of 0 for the hash
-    - apr for each character in the file name, it multiplies the current hash by 31 (a constant)
-    - adds the ASCII value of the current character
-    this process creates a unique number for each string (filename)
 
 
-2) modulo operaation:
-    - result of the hash is then taken modulo HASH_TABLE_SIZE
-    - this will ensures that the hash value always falls within the bounds of the hash table array ( mchkitch kayen exceptions f C)
-
-
-3) storing and retrieving files:
-    - when you store a file, its placed in the hash table at the index corresponding to the hash value
-    - when you want to seach for a file, the same hash function is used fel hsab te3 el index, and the file is searched at that index
-*/
-
-
-
-
-// ahhhhhh wch hedaaaaa 🤯 wa3er wa3er
 unsigned int hash_function(const char *filename) {
     unsigned int hash = 5381;  // Prime seed
     unsigned int c;
@@ -52,7 +28,6 @@ unsigned int hash_function(const char *filename) {
 }
 
 
-// O(1) collisions through chaining , mts9sinich , fo9 isti3abek 🥱
 File* find_file(SecondaryMemory *sm, const char *filename, char *buffer) {
     unsigned int index = hash_function(filename);
     File *file = sm->hash_table[index];
@@ -217,7 +192,7 @@ void trim_trailing_whitespace(char *str) {
     }
 }
 
-Record* search_record(SecondaryMemory *sm, const char* filename, int matricule, bool* success) {
+Record* search_record(SecondaryMemory *sm, const char* filename,long long matricule, bool* success) {
     if (success) *success = false;
 
     File *file = find_file(sm, filename, buffer);
@@ -242,12 +217,13 @@ Record* search_record(SecondaryMemory *sm, const char* filename, int matricule, 
     }
 
     while (fgets(buffer, sizeof(buffer), fp)) {
-        int id, mat;
+        int id; 
+        long long mat;
         char name[256];
         char is_deleted_str[10] = {0};
         bool is_deleted = false;
 
-        int num_fields = sscanf(buffer, "%d,%d,%255[^,],%9s", &id, &mat, name, is_deleted_str);
+        int num_fields = sscanf(buffer, "%d,%lld,%255[^,],%9s", &id, &mat, name, is_deleted_str);
         if (num_fields < 3) {
             continue;
         }
@@ -306,7 +282,7 @@ void update_memory_allocation(SecondaryMemory *sm, File *file) {
 }
 
 extern char buffer[BUFFER_SIZE];
-bool insert_record(SecondaryMemory *sm, const char* filename, int matricule, const char* name) {
+bool insert_record(SecondaryMemory *sm, const char* filename, long long matricule, const char* name) {
     buffer[0] = '\0';
 
     File *file = find_file(sm, filename, buffer);
@@ -339,7 +315,7 @@ bool insert_record(SecondaryMemory *sm, const char* filename, int matricule, con
     new_record.name[255] = '\0';
     new_record.is_deleted = false;
 
-    fprintf(fp, "%d,%d,%s,false\n", new_record.id, new_record.matricule, new_record.name);
+    fprintf(fp, "%d,%lld,%s,false\n", new_record.id, new_record.matricule, new_record.name);
     fclose(fp);
 
     file->metadata.size_in_records++;
@@ -351,8 +327,9 @@ bool insert_record(SecondaryMemory *sm, const char* filename, int matricule, con
 
 
 
+
 extern char buffer[BUFFER_SIZE];
-bool delete_record(SecondaryMemory *sm, const char* filename, int matricule, bool is_physical, char* error_msg) {
+bool delete_record(SecondaryMemory *sm, const char* filename, long long matricule, bool is_physical, char* error_msg) {
     buffer[0] = '\0';
     
     File *file = find_file(sm, filename, buffer);
@@ -382,21 +359,22 @@ bool delete_record(SecondaryMemory *sm, const char* filename, int matricule, boo
         header_written = true;
     }
     while (fgets(line, sizeof(line), fp)) {
-        int id, mat;
+        int id;
+        long long mat;
         char name[256];
         char is_deleted[10] = "false";
 
-        sscanf(line, "%d,%d,%[^,\n]", &id, &mat, name);
+        sscanf(line, "%d,%lld,%[^,\n]", &id, &mat, name);
 
         if (mat == matricule) {
             found = true;
             if (is_physical) {
                 continue;
             } else {
-                fprintf(temp_fp, "%d,%d,%s,true\n", id, mat, name);
+                fprintf(temp_fp, "%d,%lld,%s,true\n", id, mat, name);
             }
         } else {
-            fprintf(temp_fp, "%d,%d,%s,%s\n", id, mat, name, is_deleted);
+            fprintf(temp_fp, "%d,%lld,%s,%s\n", id, mat, name, is_deleted);
         }
     }
 
