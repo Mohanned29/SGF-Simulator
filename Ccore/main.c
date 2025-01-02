@@ -386,7 +386,7 @@ void ShowCreateFileScreen(SecondaryMemory *sm, AppState *state) {
 
 void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
-    static char record_id_input[10] = "";
+    static char record_id_input[13] = "";
     static int active_input = 0;
     static bool showResult = false;
     static bool showError = false;
@@ -407,7 +407,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     DrawText(filename, 460, startY + 40, 20, BLACK);
 
     // Record ID Input
-    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
+    DrawText("Enter Matricule :", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
@@ -423,7 +423,7 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (active_input > 0) {
         int key = GetCharPressed();
         char *currentInput = (active_input == 1) ? filename : record_id_input;
-        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 9;
+        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 12;
         
         while (key > 0) {
             if ((key >= 32 && key <= 126) && strlen(currentInput) < maxLen) {
@@ -439,7 +439,6 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         }
     }
 
-    // Search Button
     Rectangle searchBtn = {450, startY + 200, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), searchBtn);
     DrawRectangleRec(searchBtn, btnHovered ? DARKBLUE : BLUE);
@@ -449,8 +448,10 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
             bool success;
+            char *endptr;
+            long matricule = strtol(record_id_input, &endptr, 10);
             char error_msg[100];
-            Record* result = search_record(sm, filename, atoi(record_id_input), &success, error_msg);
+            Record* result = search_record(sm, filename, matricule, &success);
             
             if (success && result != NULL) {
                 showResult = true;
@@ -481,9 +482,9 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
         
         if (showResult) {
             char resultText[100];
-            snprintf(resultText, sizeof(resultText), "Record ID: %d", found_record.id);
+            snprintf(resultText, sizeof(resultText), "Matricule: %d", found_record.id);
             DrawText(resultText, 370, startY + 300, 20, Fade(BLACK, alpha));
-            DrawText(found_record.data, 370, startY + 330, 20, Fade(BLACK, alpha));
+            DrawText(found_record.name, 370, startY + 330, 20, Fade(BLACK, alpha));
         } else {
             DrawText(message, 370, startY + 315, 20, Fade(RED, alpha));
         }
@@ -496,6 +497,9 @@ void ShowSearchRecordScreen(AppState *state, SecondaryMemory *sm) {
 }
 
 void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
+
+    static char memoryStateBuffer[BUFFER_SIZE];
+    display_memory_state(sm, memoryStateBuffer);
     DrawCenteredText("Memory State", 50, 40, DARKBLUE);
 
     int blockSize = 50;
@@ -505,16 +509,20 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
     int startY = 150;
     
     Color fileColors[] = {
-        RED, BLUE, PURPLE, ORANGE, BROWN, 
+        RED, BLUE, PURPLE, ORANGE, BROWN,
         PINK, MAROON, DARKBLUE, DARKPURPLE, DARKBROWN
     };
     int numColors = sizeof(fileColors) / sizeof(fileColors[0]);
-    
     
     Color* blockColors = (Color*)malloc(sm->total_blocks * sizeof(Color));
     for (int i = 0; i < sm->total_blocks; i++) {
         blockColors[i] = GREEN;
     }
+    
+    float records_per_block = (float)sm->block_size / sizeof(Record);
+    char recordsInfo[32];
+    snprintf(recordsInfo, sizeof(recordsInfo), "Records per block: %.2f", records_per_block);
+    DrawText(recordsInfo, startX, startY - 140, 20, BLACK);
     
     int colorIndex = 0;
     int lastUsedBlock = -1;
@@ -540,7 +548,7 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
         colorIndex++;
         current = current->next;
     }
-    
+
     for (int i = 0; i < sm->total_blocks; i++) {
         int row = i / blocksPerRow;
         int col = i % blocksPerRow;
@@ -552,10 +560,10 @@ void ShowDisplayMemoryScreen(AppState *state, SecondaryMemory *sm) {
         int textWidth = MeasureText(blockNum, 20);
         DrawText(blockNum, x + (blockSize - textWidth)/2, y + blockSize/3, 20, WHITE);
     }
-    
+
     DrawRectangle(startX, startY - 60, 20, 20, GREEN);
     DrawText("Free", startX + 30, startY - 60, 20, BLACK);
-    
+
     current = sm->file_list;
     colorIndex = 0;
     int legendX = startX + 150;
@@ -639,7 +647,6 @@ void ShowDisplayFileMetadataScreen(AppState *state, SecondaryMemory *sm) {
     }
 }
 
-
 void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     static char filename[MAX_FILENAME] = "";
     static char record_id[32] = "";
@@ -648,7 +655,8 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     static bool showError = false;
     static bool showSuccess = false;
     static char message[256] = "";
-
+    static float messageTimer = 0.0f;
+    
     DrawCenteredText("Insert New Record", 50, 40, DARKBLUE);
 
     int inputWidth = 300;
@@ -661,7 +669,7 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
     DrawRectangleLinesEx(filenameBox, 2, BLUE);
     DrawText(filename, 460, startY + 40, 20, BLACK);
 
-    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
+    DrawText("Enter Matricule:", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
@@ -682,8 +690,9 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
 
     if (active_input > 0) {
         int key = GetCharPressed();
-        char *currentInput = (active_input == 1) ? filename : (active_input == 2) ? record_id : record_data;
-        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 :
+        char *currentInput = (active_input == 1) ? filename : 
+                           (active_input == 2) ? record_id : record_data;
+        int maxLen = (active_input == 1) ? MAX_FILENAME - 1 : 
                     (active_input == 2) ? 31 : 255;
         
         while (key > 0) {
@@ -699,60 +708,43 @@ void ShowInsertNewRecordScreen(AppState *state, SecondaryMemory *sm) {
             currentInput[strlen(currentInput) - 1] = '\0';
         }
     }
-    Rectangle submitBtn = {450, startY + 300, inputWidth, 50};
-    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), submitBtn);
-    DrawRectangleRec(submitBtn, btnHovered ? DARKBLUE : BLUE);
+
+    Rectangle insertBtn = {450, startY + 300, inputWidth, 50};
+    bool btnHovered = CheckCollisionPointRec(GetMousePosition(), insertBtn);
+    DrawRectangleRec(insertBtn, btnHovered ? DARKBLUE : BLUE);
     DrawText("Insert Record", 520, startY + 315, 20, WHITE);
+
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id) > 0 && strlen(record_data) > 0) {
-            char buffer[BUFFER_SIZE];
-            File *file = find_file(sm, filename, buffer);
-            
-            if (file != NULL) {
-                FILE *fp = fopen(filename, "ab");
-                if (fp != NULL) {
-                    Record new_record;
-                    new_record.id = atoi(record_id);
-                    strncpy(new_record.data, record_data, 255);
-                    new_record.data[255] = '\0';
-                    
-                    if (fwrite(&new_record, sizeof(Record), 1, fp) == 1) {
-                        file->metadata.size_in_records++;
-                        update_memory_allocation(sm, file);
-                        showSuccess = true;
-                        showError = false;
-                        strcpy(message, "Record inserted successfully!");
-                        filename[0] = '\0';
-                        record_id[0] = '\0';
-                        record_data[0] = '\0';
-                    } else {
-                        showError = true;
-                        showSuccess = false;
-                        strcpy(message, "Error writing record to file.");
-                    }
-                    fclose(fp);
-                } else {
-                    showError = true;
-                    showSuccess = false;
-                    strcpy(message, "Error opening file.");
-                }
+            bool success;
+            char *endptr;
+            long matricule = strtol(record_id, &endptr, 10);
+            char error_msg[256];
+            if (insert_record(sm, filename, matricule, record_data)) {
+                showSuccess = true;
+                showError = false;
+                strcpy(message, "Record inserted successfully!");
+                filename[0] = '\0';
+                record_id[0] = '\0';
+                record_data[0] = '\0';
             } else {
                 showError = true;
                 showSuccess = false;
-                strcpy(message, "File not found.");
+                strcpy(message, error_msg);
             }
+            messageTimer = 2.0f;
         } else {
             showError = true;
             showSuccess = false;
-            strcpy(message, "Please fill all fields.");
+            strcpy(message, "Please fill all fields!");
+            messageTimer = 2.0f;
         }
     }
-    if (showSuccess) {
-        DrawText(message, 450, startY + 370, 20, GREEN);
-    } else if (showError) {
-        DrawText(message, 450, startY + 370, 20, RED);
+
+    if (messageTimer > 0) {
+        DrawText(message, 450, startY + 370, 20, showError ? RED : GREEN);
+        messageTimer -= GetFrameTime();
     }
-    
 
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
@@ -767,10 +759,11 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     static bool showResult = false;
     static bool showError = false;
     static char message[256] = "";
-    static char buffer[BUFFER_SIZE];
+    static bool is_physical = true;
+    static float messageTimer = 0.0f;
     
     DrawCenteredText("Delete Record", 50, 40, DARKBLUE);
-    
+
     int inputWidth = 300;
     int inputHeight = 40;
     int startY = 150;
@@ -781,17 +774,29 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
     DrawRectangleLinesEx(filenameBox, 2, BLUE);
     DrawText(filename, 460, startY + 40, 20, BLACK);
 
-    DrawText("Entrer le matricule:", 450, startY + 100, 20, BLACK);
+    DrawText("Enter Record ID:", 450, startY + 100, 20, BLACK);
     Rectangle idBox = {450, startY + 130, inputWidth, inputHeight};
     DrawRectangleRec(idBox, (active_input == 2) ? LIGHTGRAY : WHITE);
     DrawRectangleLinesEx(idBox, 2, BLUE);
     DrawText(record_id_input, 460, startY + 140, 20, BLACK);
 
+    DrawText("Select Deletion Type:", 450, startY + 180, 20, BLACK);
+    Rectangle physicalBtn = {450, startY + 210, inputWidth/2 - 5, 40};
+    Rectangle logicalBtn = {450 + inputWidth/2 + 5, startY + 210, inputWidth/2 - 5, 40};
+    
+    DrawRectangleRec(physicalBtn, is_physical ? DARKBLUE : BLUE);
+    DrawRectangleRec(logicalBtn, !is_physical ? DARKBLUE : BLUE);
+    DrawText("Physical", 460, startY + 220, 20, WHITE);
+    DrawText("Logical", 460 + inputWidth/2 + 5, startY + 220, 20, WHITE);
+
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (CheckCollisionPointRec(GetMousePosition(), filenameBox)) active_input = 1;
         else if (CheckCollisionPointRec(GetMousePosition(), idBox)) active_input = 2;
+        else if (CheckCollisionPointRec(GetMousePosition(), physicalBtn)) is_physical = true;
+        else if (CheckCollisionPointRec(GetMousePosition(), logicalBtn)) is_physical = false;
         else active_input = 0;
     }
+
     if (active_input > 0) {
         int key = GetCharPressed();
         char *currentInput = (active_input == 1) ? filename : record_id_input;
@@ -811,16 +816,17 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
         }
     }
 
-    Rectangle deleteBtn = {450, startY + 200, inputWidth, 50};
+    Rectangle deleteBtn = {450, startY + 270, inputWidth, 50};
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), deleteBtn);
     DrawRectangleRec(deleteBtn, btnHovered ? DARKBROWN : RED);
-    DrawText("Delete Student", 520, startY + 215, 20, WHITE);
+    DrawText("Delete Record", 520, startY + 285, 20, WHITE);
 
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0 && strlen(record_id_input) > 0) {
-            const char* result = delete_record(sm, filename, atoi(record_id_input), buffer);
-            
-            if (strstr(result, "successfully")) {
+            char error_msg[256];
+            char *endptr;
+            long matricule = strtol(record_id_input, &endptr, 10);
+            if (delete_record(sm, filename, matricule, is_physical, message)) {
                 showResult = true;
                 showError = false;
                 filename[0] = '\0';
@@ -829,15 +835,18 @@ void ShowDeleteRecordScreen(AppState *state, SecondaryMemory *sm) {
                 showResult = false;
                 showError = true;
             }
-            strcpy(message, result);
+            strcpy(message, error_msg);
+            messageTimer = 2.0f;
         } else {
             showError = true;
             strcpy(message, "Please fill all fields!");
+            messageTimer = 2.0f;
         }
     }
 
-    if (showResult || showError) {
-        DrawText(message, 450, startY + 280, 20, showError ? RED : GREEN);
+    if (messageTimer > 0) {
+        DrawText(message, 450, startY + 340, 20, showError ? RED : GREEN);
+        messageTimer -= GetFrameTime();
     }
 
     if (IsKeyPressed(KEY_SPACE)) {
@@ -853,6 +862,7 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
     static bool showResult = false;
     static bool showError = false;
     static char message[256] = "";
+    static float messageTimer = 0.0f;
     
     DrawCenteredText("Defragment File", 50, 40, DARKBLUE);
     
@@ -894,13 +904,11 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
     bool btnHovered = CheckCollisionPointRec(GetMousePosition(), defragBtn);
     DrawRectangleRec(defragBtn, btnHovered ? DARKBLUE : BLUE);
     DrawText("Defragment File", 500, startY + 115, 20, WHITE);
-    
+
     if (btnHovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (strlen(filename) > 0) {
-            char buffer[BUFFER_SIZE];
-            File *file = find_file(sm, filename, buffer);
-            
-            if (file != NULL) {
+            char error_msg[256];
+            if (defragment_file(sm, filename, error_msg)) {
                 showResult = true;
                 showError = false;
                 sprintf(message, "Defragmentation completed for file '%s'", filename);
@@ -908,23 +916,28 @@ void ShowDefragmentFileScreen(AppState *state, SecondaryMemory *sm) {
             } else {
                 showError = true;
                 showResult = false;
-                sprintf(message, "File '%s' not found", filename);
+                strcpy(message, error_msg);
             }
+            messageTimer = 2.0f;
         } else {
             showError = true;
             showResult = false;
             strcpy(message, "Please enter a filename");
+            messageTimer = 2.0f;
         }
     }
 
-    if (showResult || showError) {
+    if (messageTimer > 0) {
         DrawText(message, 450, startY + 180, 20, showError ? RED : GREEN);
+        messageTimer -= GetFrameTime();
     }
+
     if (IsKeyPressed(KEY_SPACE)) {
         *state = STATE_MAIN_MENU;
         TransitionEffect(WHITE, 60);
     }
 }
+
 
 
 void ShowDeleteFileScreen(AppState *state, SecondaryMemory *sm) {
