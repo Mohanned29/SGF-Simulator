@@ -1,5 +1,7 @@
 # File System Simulator
 
+This project may have some problems , please be aware of this before using it
+
 This project is a **File System Simulator**, implemented in **C** with a graphical interface using **Raylib**. It manages file operations such as **creating files, inserting records, searching, deleting, defragmenting, and compacting memory**. The system simulates secondary storage with a **hash-based allocation mechanism**.
 
 ## Features
