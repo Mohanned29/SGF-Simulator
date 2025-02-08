@@ -1,8 +1,5 @@
 # File System Simulator
 
-[🎥 Watch the Demo Video](https://github.com/Mohanned29/SGF-Simulator/sfsd.mp4)
-
-
 This project is a **File System Simulator**, implemented in **C** with a graphical interface using **Raylib**. It manages file operations such as **creating files, inserting records, searching, deleting, defragmenting, and compacting memory**. The system simulates secondary storage with a **hash-based allocation mechanism**.
 
 ## Features
